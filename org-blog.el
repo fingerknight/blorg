@@ -298,13 +298,16 @@ unconditionally."
       (when (or force-render
                 special)
         (org-blog-publish-file it special))))
-  (message "All posts have been published")
-  ;; (let ((org-blog-enable-deprecation-warning nil))
-    (org-blog-assemble-index)
+  (message "All posts published")
+  (f-delete (f-expand "assets" org-blog-publish-directory) t)
+  (f-delete (f-expand "static" org-blog-publish-directory) t)
+  (f-copy (f-expand "assets" org-blog-directory) (f-slash org-blog-publish-directory))
+  (f-copy (f-expand "static" org-blog-directory) (f-slash org-blog-publish-directory))
+  (message "All static files copied.")
+  (org-blog-assemble-index)
     ;; (org-blog-assemble-rss)
-    (org-blog-assemble-archive)
-    (org-blog-assemble-tags)
-  )
+  (org-blog-assemble-archive)
+  (org-blog-assemble-tags))
 
 (defun org-blog-needs-publishing-p (post-filename)
   "Check whether POST-FILENAME was changed since last render.
@@ -859,19 +862,6 @@ blog post, sorted by tags, but no post body."
        'org-blog-assemble-tags-archive-tag
        tag-tree "")
       "<h1 class=\"post-title\"> TAGs </h1>\n"))))
-
-(defun blog-publish ()
-  (interactive)
-  (shell-command-to-string
-   (format "cp -rf %s %s"
-           (f-expand "assets" org-blog-directory)
-           org-blog-publish-directory))
-  (shell-command-to-string
-   (format "cp -rf %s %s"
-           (f-expand "static" org-blog-directory)
-           org-blog-publish-directory))
-  (org-blog-publish t))
-
 
 (defun org-blog-get-preview (post-filename)
   "Get title, date, tags from POST-FILENAME and get the first paragraph from the rendered HTML."
