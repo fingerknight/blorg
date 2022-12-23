@@ -1,0 +1,11 @@
+* ORG-BLOG
+An personal fork of [[https://github.com/bastibe/org-static-blog][org-static-blog]].
+
+** Purposes
+- Let publish page be ~index.html~ in a directory named the ~title~ of page, instead of ~title.html~. I prefer to access url like ~xxx/post/~ than ~xxx/post.html~.
+- Integrate with [[https://github.com/protesilaos/denote][denote]], a note taking system. They both use less headers: ~#+title~, ~#+date~ and ~#+filetags~ are enough. I gather /posts/ and /drafts/ into denote directory --- they are separated in org-static-blog.
+- In order to distinguish *notes* and *posts*, there is another header ~#+publish~: when the vaule is lack or ~nil~, the org file won't be published. If the value of ~#+publish~ is ~special~, this post will be published without TOC, date and tags. (This may be very slow if there are lots of notes in directory. TODO)
+- Blog url is unnecessary. All the hyperlinks to local soureces will be relative to root url.
+- Remove some functions I don't use.
+- Rewrite the cdoe by my way.
+
