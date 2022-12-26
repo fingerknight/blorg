@@ -4,8 +4,15 @@ An personal fork of [[https://github.com/bastibe/org-static-blog][org-static-blo
 ** Purposes
 - Let publish page be ~index.html~ in a directory named the ~title~ of page, instead of ~title.html~. I prefer to access url like ~xxx/post/~ than ~xxx/post.html~.
 - Integrate with [[https://github.com/protesilaos/denote][denote]], a note taking system. They both use less headers: ~#+title~, ~#+date~ and ~#+filetags~ are enough. I gather /posts/ and /drafts/ into denote directory --- they are separated in org-static-blog.
-- In order to distinguish *notes* and *posts*, there is another header ~#+publish~: when the vaule is lack or ~nil~, the org file won't be published. If the value of ~#+publish~ is ~special~, this post will be published without TOC, date and tags. (This may be very slow if there are lots of notes in directory. TODO)
+- Posts need published should have a tag ~blog~ or ~blogsp~. ~blog~ for normal posts, ~blogsp~ for special posts, ~/about~ for example.
 - Blog url is unnecessary. All the hyperlinks to local soureces will be relative to root url.
 - Remove some functions I don't use.
-- Rewrite the cdoe by my way.
+- Rewrite the cdoe by my way. Use the template I prefer, e.g., remove the caption number of figures and tables, wrap ~<img>~ within a ~<a>~ so that it will show in a new tab by clicking.
 
+** TODO
+- [ ] Preview in index page.
+- [ ] Publish the tags pages that involved.
+- [ ] Remove the published posts whose original ~.org~ file has gone.
+- [ ] Offer an API to clean out-of-date assets.
+- [ ] RSS support.
+- [ ] More complicated enviroment of math support.
