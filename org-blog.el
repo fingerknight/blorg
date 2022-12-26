@@ -452,9 +452,10 @@ The index page contains the last `org-blog-index-length`
 posts as full text posts."
   (org-blog-assemble-multipost-page
    (f-expand org-blog-index-file org-blog-publish-directory)
-   (last (-sort #'sort-file-recent
-                org-blog-post-filenames-without-special)
-         org-blog-index-length)
+   (-slice (-sort #'sort-file-recent
+                  org-blog-post-filenames-without-special)
+           0
+           org-blog-index-length)
    org-blog-index-front-matter
    nil
    t))
@@ -623,7 +624,8 @@ blog post, but no post body."
    (org-blog-template
     (format "ARCHIVEs - %s" org-blog-publish-title)
     (mapconcat 'org-blog-get-post-summary
-               org-blog-post-filenames-without-special
+               (-sort #'sort-file-recent
+                      org-blog-post-filenames-without-special)
                "")
     (concat "<h1 class=\"post-title\"> ARCHIVEs </h1>"))))
 
