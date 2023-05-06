@@ -16,3 +16,4 @@ An personal fork of [[https://github.com/bastibe/org-static-blog][org-static-blo
 - [ ] Offer an API to clean out-of-date assets.
 - [ ] RSS support.
 - [ ] More complicated enviroment of math support.
+- [X] Copy only assets refered in posts.

@@ -174,6 +174,11 @@ whose value of `publish' is not \"special\".")
 
 (defvar org-blog-extras nil)
 
+(defvar org-blog-math-num nil
+  "A list with two elements:
+One is the chapter number, which is a string.
+Another is the item number, which is a integer")
+
 (defun sort-file-recent (it other)
   (ts> (org-blog-get-date it)
        (org-blog-get-date other)))
@@ -321,6 +326,13 @@ If ALL is `nil', then \"blog\" and \"blogsp\" are excluded."
   (-difference (denote-extract-keywords-from-path post-filename)
                (unless all '("blog" "blogsp"))))
 
+(defun org-blog-get-math-chapter (post-filename)
+  "Get chapter number for mathametics."
+  (or
+   (car (s-match "\\([0-9]+\.\\)+"
+                 (org-blog-get-title post-filename)))
+   ""))
+
 (defun org-blog-build-toc (content)
   "Build TOC by HTML CONTENT"
   (let* ((headlines
@@ -331,30 +343,36 @@ If ALL is `nil', then \"blog\" and \"blogsp\" are excluded."
            (s-match-strings-all
             "<h\\([0-9]\\)[^>]*id=\"\\([^\"]+\\)\"[^>]*>\\([^<]+\\)</h[0-9]>"
             content)))
-         (prev-level (1- (caar headlines)))
+         (prev-level (if headlines
+                       (1- (caar headlines))
+                       0))
 	     (start-level prev-level))
     (concat
      "<div class=\"toc\">\n"
-     "<h2 class=\"toc-title\"> TOC </h2>\n"
-     "<nav id=\"TableOfContents\">\n"
-    (apply
-     'concat
-     (-snoc
-      (--map
-	   (seq-let (level title id) it
-	     (concat
-	      (let* ((cnt (- level prev-level))
-		         (times (if (> cnt 0) (1- cnt) (- cnt))))
-	        (setq prev-level level)
-	        (concat
-             (s-repeat times
-	                   (cond ((> cnt 0) "\n<ul>\n<li>")
-			                 ((< cnt 0) "</li>\n</ul>\n")))
-	         (if (> cnt 0) "\n<ul>\n<li>" "</li>\n<li>")))
-          (format "\n<a href=\"#%s\"> %s </a>" id title)))
-       headlines)
-     (s-repeat (- prev-level start-level) "</li>\n</ul>\n")))
-    "</nav>\n</div>\n")))
+     (if headlines
+         (concat
+          "<h2 class=\"toc-title\"> TOC </h2>\n"
+          "<nav id=\"TableOfContents\">\n"
+          (apply
+           'concat
+           (-snoc
+            (--map
+	         (seq-let (level title id) it
+	           (concat
+	            (let* ((cnt (- level prev-level))
+		               (times (if (> cnt 0) (1- cnt) (- cnt))))
+	              (setq prev-level level)
+	              (concat
+                   (s-repeat times
+	                         (cond ((> cnt 0) "\n<ul>\n<li>")
+			                       ((< cnt 0) "</li>\n</ul>\n")))
+	               (if (> cnt 0) "\n<ul>\n<li>" "</li>\n<li>")))
+                (format "\n<a href=\"#%s\"> %s </a>" id title)))
+             headlines)
+            (s-repeat (- prev-level start-level) "</li>\n</ul>\n")))
+          "</nav>\n")
+       "\n")
+    "</div>\n")))
 
 (defun org-blog-get-tag-tree ()
   "Return an association list of tags to filenames.
@@ -710,11 +728,11 @@ blog post, sorted by tags, but no post body."
      (cdr it)
      (concat "<h1 class=\"post-title\"> TAG: #" (car it) " </h1>"))))
 
-(defun org-blog-copy-directory (directory)
-      (f-delete (f-expand (f-base directory)
+(defun org-blog-copy-directory (string)
+      (f-delete (f-expand (f-base string)
                           org-blog-publish-directory)
                 t)
-      (f-copy (f-expand directory org-blog-posts-directory)
+      (f-copy (f-expand string org-blog-posts-directory)
               org-blog-publish-directory))
 
 ;;; template
@@ -777,6 +795,82 @@ INFO is a plist used as a communication channel."
                      "</p>\n</li>")))))
 	  definitions
 	  "\n"))))
+
+(defun org-blog-html-special-block (special-block contents info)
+  "Transcode a SPECIAL-BLOCK element from Org to HTML.
+CONTENTS holds the contents of the block.  INFO is a plist
+holding contextual information."
+  (let* ((block-type (org-element-property :type special-block))
+         (name (org-element-property :name special-block))
+         (html5-fancy (and (org-html--html5-fancy-p info)
+                           (member block-type org-html-html5-elements)))
+         (attributes (org-export-read-attribute :attr_html special-block))
+         (math-block (car (member block-type '("definition"
+                                               "proposition"
+                                               "lemma"
+                                               "theorem"
+                                               "proof"
+                                               "axiom"
+                                               "remark"
+                                               "solution"))))
+         (num (if (and math-block
+                       (not (string= math-block "proof")))
+                  (progn
+                    (setcdr org-blog-math-num
+                            (list (1+ (cadr org-blog-math-num))))
+                    (format " %s%d"
+                                 (car org-blog-math-num)
+                                 (cadr org-blog-math-num)))
+                "")))
+    
+    (unless html5-fancy
+      (let ((class (plist-get attributes :class)))
+        (setq attributes (plist-put attributes :class
+                                    (if class (concat class " " block-type)
+                                      block-type)))))
+    (when math-block
+      (setq attributes (plist-put attributes
+                                  :class
+                                  (format "mathblock %s" math-block))))
+    (let* ((contents (if contents
+                         (if math-block
+                             (let* ((pattern "<\\([^ >]*\\)[^>]*>")
+                                    (tag-name (cadr (s-match pattern
+                                                             contents)))
+                                    (start-pos (car (s-matched-positions-all pattern
+                                                                             contents))))
+                               (if (string= tag-name "p")
+                                   (concat (substring contents 0 (cdr start-pos))
+                                           "<span class=\"mathblock title\">"
+                                           (s-capitalize math-block) num
+                                           (if name
+                                               (format "<span class=\"mathblock name\"> (%s)</span>"
+                                                       name))
+                                           ". </span>\n"
+                                           (substring contents (cdr start-pos)))
+                                 (concat "<span class=\"mathblock title\">"
+                                         (s-capitalize math-block) num
+                                         (if name
+                                             (format "<span class=\"mathblock name\"> (%s)</span>"
+                                                     name))
+                                         ". </span>\n"
+                                         contents)))
+                             contents)
+                       ""))
+	       (reference (org-html--reference special-block info))
+	       (a (org-html--make-attribute-string
+	           (if (or (not reference) (plist-member attributes :id))
+		           attributes
+		         (plist-put attributes :id reference))))
+	       (str (if (org-string-nw-p a) (concat " " a) "")))
+      (when (string= math-block "proof")
+        ;; TODO: find a better way to insert QED square.
+        (setq contents (concat (substring contents 0 -5)
+                               "<span class=\"QED\">□</span>\n</p>")))
+      (if html5-fancy
+          (format "<%s%s>\n%s</%s>" block-type str contents block-type)
+        (format "<div%s>\n%s\n</div>" str contents))
+       )))
 
 (defun org-blog-html-src-block (src-block _contents info)
   "SRC-BLOCK, for integrating with highlight.js"
@@ -972,6 +1066,13 @@ Remove `table-number'."
     (cond
      (is-image
       (seq-let (_ before src after) is-image
+        (let ((cp-src (f-expand src org-blog-assets-directory))
+              (cp-dst (f-expand src (f-expand (f-relative org-blog-assets-directory
+                                                         org-blog-posts-directory)
+                                              org-blog-publish-directory))))
+          (when (f-exists-p cp-dst)
+            (f-delete cp-dst))
+          (f-copy cp-src cp-dst))
         (setq src (f-expand src "/assets"))
         (format "<a href=\"%s\" target=\"_blank\">%s</a>"
                 src
@@ -982,7 +1083,8 @@ Remove `table-number'."
         (if (--any-p (s-starts-with-p it href)
                      '("http" "#"))
             ;; A hack way to add `target'
-            (setq href (concat href "\" target=\"_blank"))
+            (unless (s-starts-with-p "#" href)
+              (setq href (concat href "\" target=\"_blank")))
           
           ;; local file
           ;; start with one or more `../'
@@ -1090,6 +1192,7 @@ hljs.highlightElement(codeElement);
                      (footnote-reference . org-blog-html-footnote-reference)
                      (src-block . org-blog-html-src-block)
                      (quote-block . org-blog-html-quote-block)
+                     (special-block . org-blog-html-special-block)
                      (paragraph . org-blog-html-paragraph)
                      (table . org-blog-html-table)))
 
@@ -1100,6 +1203,8 @@ The index, archive, tags, and RSS feed are not updated."
   (interactive "f")
   (message "Publishing: %s" post-filename)
   (let* ((org-blog-extras nil)
+         (org-blog-math-num (list (org-blog-get-math-chapter post-filename)
+                                  0))
          (content (org-blog-render-post-content post-filename))
          (toc (unless (org-blog-is-special-p post-filename)
                 (org-blog-build-toc content))))
@@ -1138,7 +1243,8 @@ unconditionally."
     (org-blog-assemble-tags))
 
   (org-blog-copy-directory org-blog-static-directory)
-  (org-blog-copy-directory org-blog-assets-directory))
+  ;; (org-blog-copy-directory org-blog-assets-directory)
+  )
  
 
 (provide 'org-blog)
