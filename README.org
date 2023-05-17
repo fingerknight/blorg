@@ -1,19 +1,294 @@
-* ORG-BLOG
-An personal fork of [[https://github.com/bastibe/org-static-blog][org-static-blog]].
+#+title: ORG-BLOG
 
-** Purposes
-- Let publish page be ~index.html~ in a directory named the ~title~ of page, instead of ~title.html~. I prefer to access url like ~xxx/post/~ than ~xxx/post.html~.
-- Integrate with [[https://github.com/protesilaos/denote][denote]], a note taking system. They both use less headers: ~#+title~, ~#+date~ and ~#+filetags~ are enough. I gather /posts/ and /drafts/ into denote directory --- they are separated in org-static-blog.
-- Posts need published should have a tag ~blog~ or ~blogsp~. ~blog~ for normal posts, ~blogsp~ for special posts, ~/about~ for example.
-- Blog url is unnecessary. All the hyperlinks to local soureces will be relative to root url.
-- Remove some functions I don't use.
-- Rewrite the cdoe by my way. Use the template I prefer, e.g., remove the caption number of figures and tables, wrap ~<img>~ within a ~<a>~ so that it will show in a new tab by clicking.
+An personal fork of [[https://github.com/bastibe/org-static-blog][org-static-blog]]. Integrate with [[https://github.com/protesilaos/denote][denote]], a simple note-taking tool.
 
-** TODO
+* Feature
+- Wrap all ~.html~ in a folder, so that url looks like ~/post/post1~, instead of ~/post/post1.html~.
+- Use cache for incrementally publishing, i.e., only the modified notes will be published.
+- Integrate with Denote, using ~#+filetags: :blog:~ to identify notes needto to be published.
+- Automatically remove out-of-date publishments.
+- Integrate with math, highlight, and mermaid. Of courese, necessary resources and configuration are needed.
+
+* Introduction to Denote
+The main idea of Dente is that all notes follow a file-naming scheme. It looks like ~20230508T140538--Name__tag1_tag2.org~. The first part is the unique identity, default the timestampe when created. The second part is the title of the note. The third part contains the keywords (or tags) of note.
+
+The biggest convenience is we can get that three info from the file's name without actually opening it.
+
+* Requirement
+- [[https://github.com/magnars/dash.el][dash.el]]
+- [[https://github.com/rejeep/f.el][f.el]]
+- [[https://github.com/magnars/s.el][s.el]]
+- denote
+
+* Structure
+** Output Directory
+Directory of published files is like:
+#+begin_src
+blog
+├── archive
+│   └── index.html
+├── assets
+│   ├── 0179b24839018784b799a73b790d054c.jpg
+│   └── ...
+├── index.html
+├── post
+│   ├── 20221223T144635
+│   │   └── index.html
+│   └── ...
+├── static
+│   ├── favicon.ico
+│   └── ...
+├── tag
+│   ├── tag-1
+│   ├── tag-2
+│   └── ...
+└── tags
+    └── index.html
+#+end_src
+- ~archive~ A page contains all the posts.
+- ~assets~ Assets used in posts usually images.
+- ~index.html~ The index page.
+- ~post~ All the posts
+- ~static~ e.g., ~css~, ~js~ and fonts.
+- ~tag~ A tag page contains all the posts that use this tag.
+- ~tags~ An archive page contains all the tags.
+
+** Each HTML file
+The struture of each single HTML file is like:
+#+begin_src html
+<html>
+<head>
+  org-blog-page-head
+</head>
+<body>
+  <div class="header">
+    org-blog-header-template
+  </div>
+  <div class="main">
+    <div id="preamble" class="status">
+      preamble
+    </div>
+    <div id="content">
+      content
+    </div>
+    <div id="postamble" class="status">
+      postamble
+    </div>
+  </div>
+  <div class=\"footer\">
+    org-blog-footer-template
+  </div>
+</body>
+</html>
+#+end_src
+
+* Configuration
+*** Basic
+- ~org-blog-meta-title~ Title of blog.
+- ~org-blog-meta-author~ Author of blog.
+- ~org-blog-meta-slogan~ Slogan showed in the home page.
+- ~org-blog-no-post-tag~ Do not pushlish the subtree with this tag or property. Default is ~nonpost~.
+- ~org-blog-index-length~ Number of articles to include on index page. Default is 5.
+- ~org-blog-date-format~ Formatter of date. See also [[https://www.gnu.org/software//emacs/manual/html_node/calc/Date-Formatting-Codes.html][Date Formatting Codes (GNU Emacs Calc Manual)]].
+- ~org-blog-cache-file~ A JSON file to cache for incrementally publishing. Default is ~~/.emacs.d/org-blog-cache.json~.
+
+*** Templates
+- ~org-blog-page-head-template~ A list of strings, that is concated beneath ~<head>~. e.g., ~<meta>~, style sheets and javascript.
+- ~org-blog-page-header-template~ A HTML string put before the content of each page. Say myself, I put a nav into it like:
+  #+begin_src lisp
+(concat "<div class=\"home-page\">\n"
+                   (format "<a href=\"/\">%s</a>" org-blog-meta-title)
+                   "</div>"
+                   "<div class=\"nav\">\n"
+                   "<div class=\"nav item\">\n"
+                   "<a href=\"/tags\">标签</a>\n"
+                   "</div>\n"
+                   "<div class=\"nav item\">\n"
+                   "<a href=\"/archive\">归档</a>\n"
+                   "</div>\n"
+                   "<div class=\"nav item\">\n"
+                   "<a href=\"/about\">关于</a>\n"
+                   "</div>\n"
+                   "</div>\n")
+  #+end_src
+- ~org-blog-page-footer-template~ A HTML string put after the content of each page. e.g. copyright or some other links.
+- ~org-blog-page-preamble-template~ A list of strings put before the content of each page.
+- ~org-blog-page-postamble-template~ A list of strings put after the content of each page. 
+
+*** Paths
+**** Src
+- ~org-blog-posts-directory~. Directory where ~.org~ notes are. Recommand to use ~denote-directory~.
+- ~org-blog-static-directory~ Directory where original static resoureces are.
+- ~org-blog-assets-directory~ Directory where original assets are.
+
+**** Dst
+- ~org-blog-publish-directory~ Where to publish blog. Default is ~~/blog~.
+- ~org-blog-publish-posts-directory~ Relative directory to ~org-blog-publish-directory~, where published posts are stored. Default is ~post/~.
+- ~org-blog-publish-archive-directory~ Relative directory to ~org-blog-publish-directory~, where save the published index.html of archive page. Default is ~archive/~.
+- ~org-blog-publish-tag-directory~ Relateive directory to ~org-blog-publish-directory~, where save the published index.html of tag archive page. Default is ~tags/~.
+- ~org-blog-publish-tags-directory~ Relateive directory to ~org-blog-publish-directory~, where save published tags page. Default is ~tag/~.
+- ~org-blog-publish-static-directory~ Relateive directory to ~org-blog-publish-directory~, where save copy of static resources. Default is ~static/~.
+- ~org-blog-publish-assets-directory~ Relateive directory to ~org-blog-publish-directory~, where save copy of assets. Default is ~assets/~.
+  
+* Org File
+Use ~M-x denote~ to create a note, and it is recommanded to use the identifier style built in Denote.
+
+You want this post published, then add ~:blog:~ to ~#+filetags:~.
+
+If this post is /special/, e.g., ~/about~ page, use ~:blogsp:~ instead, and add ~#+location:~ to tell where this post should put. The variable is a relative path to `org-blog-publish-directory`.
+
+For some headlines expected not to publish, add tags you set in ~~org-blog-no-post-tag~ say ~:nonpost:~, so this section will be omitted.
+
+** Links
+All links to another ~.org~ note is rewritten to relative url, such as ~/post/xxx~. Other links starting with "http" won't change.
+
+** Images
+So as links, all images' src is relative like ~/assets/xxx.png~.
+
+Published images' name is rewritten to a md5 string by ~(md5 relative-path-to original assets directory)~.
+
+And all images are wrapped by ~<a>~ so there opens a new tab to show original file after clicking it.
+
+** Quote
+You add the source of this quote like:
+#+begin_example
+#+attr_html :from 《海上婚礼》 :by 海子
+#+begin_quote
+风吹起你的头发，一张棕色的小网，撒满我的面颊，我一生也不想挣脱。
+#+end_quote
+#+end_example
+
+It will be exported to:
+#+begin_src html
+<blockquote>
+<p>
+风吹起你的头发，一张棕色的小网，撒满我的面颊，我一生也不想挣脱。
+</p>
+<p class="quote-source"> —— 海子, 《海上婚礼》 </p>
+</blockquote>
+#+end_src
+
+** Math blocks
+Support:
+- ~#+begin_definition ... #+end_definition~
+- ~#+begin_proposition ... #+end_proposition~
+- ~#+begin_lemma ... #+end_lemma~
+- ~#+begin_theorem ... #+end_theorem~
+- ~#+begin_proof ... #+end_proof~
+- ~#+begin_axiom ... #+end_axiom~
+- ~#+begin_remark ... #+end_remark~
+- ~#+begin_solution ... #+end_solution~
+
+* 3-rd parties
+Now support mathblock, highlight codes and mermaid.
+
+Enable them by setting ~org-blog-third-party~:
+#+begin_src lisp
+(setq org-blog-third-party
+      (list ('math (cons "style" "script"))
+            ('highlight (cons "style" "script"))
+            ('mermaid (cons "style" "script"))))
+#+end_src
+
+~style~ and ~script~ are HTML strings, that will be insert before and after content.
+
+E.g., a note contains a math block. Then org-blog will fetch ~style~ in ~'math~ CONS then insert them into section ~<div id="preamble">~ in exported HTML, and ~script~ into ~<div id="preamble">~.
+
+Say you are with Katex, then you set ~org-blog-third-part~ to:
+#+begin_src lisp
+(setq org-blog-third-party
+      (list ('math (cons
+                    "<link rel=\"stylesheet\" href=\"/static/katex/katex.min.css\">" "script"
+                    (concat "<script defer src=\"/static/katex/katex.min.js\"></script>\n"
+                            "<script defer src=\"/static/katex/auto-render.min.js\"></script>\n")))))
+#+end_src
+
+** My setting of 3-rd party
+#+html: <details>
+#+html: <summary>切换折叠</summary>
+
+#+begin_src lisp
+(setq org-blog-third-party
+      (list
+       (cons 'math
+             (cons
+              "<link rel=\"stylesheet\" href=\"/static/katex/katex.min.css\">"
+              (concat "<script defer src=\"/static/katex/katex.min.js\"></script>\n"
+                      "<script defer src=\"/static/katex/auto-render.min.js\"></script>\n"
+                      "<script>\n"
+                      "let macros = {
+\"\\\\C\": \"\\\\mathbb{C}\",
+\"\\\\N\": \"\\\\mathbb{N}\",
+\"\\\\Q\": \"\\\\mathbb{Q}\",
+\"\\\\R\": \"\\\\mathbb{R}\",
+\"\\\\Z\": \"\\\\mathbb{Z}\",
+\"’\": \"'\"
+};\n"
+                      "document.addEventListener(\"DOMContentLoaded\", function() {
+renderMathInElement(document.getElementById(\"content\"), {
+strict: false,
+delimiters: [
+{\"display\": true,\"left\": \"$$\",\"right\": \"$$\"},
+{\"display\": true,\"left\": \"\\\\[\",\"right\": \"\\\\]\"},
+{\"display\": true,\"left\": \"\\\\begin{equation}\",\"right\": \"\\\\end{equation}\"},
+{\"display\": true,\"left\": \"\\\\begin{equation*}\",\"right\": \"\\\\end{equation*}\"},
+{\"display\": true,\"left\": \"\\\\begin{align}\",\"right\": \"\\\\end{align}\"},
+{\"display\": true,\"left\": \"\\\\begin{align*}\",\"right\": \"\\\\end{align*}\"},
+{\"display\": true,\"left\": \"\\\\begin{alignat}\",\"right\": \"\\\\end{alignat}\"},
+{\"display\": true,\"left\": \"\\\\begin{alignat*}\",\"right\": \"\\\\end{alignat*}\"},
+{\"display\": true,\"left\": \"\\\\begin{gather}\",\"right\": \"\\\\end{gather}\"},
+{\"display\": true,\"left\": \"\\\\begin{CD}\",\"right\": \"\\\\end{CD}\"},
+{\"display\": false,\"left\": \"$\",\"right\": \"$\"},
+{\"display\": false,\"left\": \"\\\\(\",\"right\": \"\\\\)\"}
+],
+macros});})\n"
+                      "</script>")))
+
+       (cons 'highlight
+             (cons
+              "<link rel=\"stylesheet\" href=\"/static/highlight/dracula.css\">"
+              (concat "<script src=\"/static/highlight/highlight.min.js\"></script>\n"
+                      "<script>\n"
+                      "Array.from(document.querySelectorAll('#content pre')).forEach(
+node => {
+let codeElement = node.querySelector(\"code\"),
+    excludes = [\"mermaid\"];
+
+if (!codeElement){
+return
+}
+let language = codeElement.getAttribute(\"class\").split(\"-\")[1];
+if (excludes.includes(language)) {
+return
+}
+
+hljs.highlightElement(codeElement);
+});\n"
+                      "</script>")))
+
+       (cons 'mermaid
+             (cons
+              ""
+              (concat "<script src=\"/static/mermaid/mermaid.min.js\"></script>\n"
+                      "<script>\n"
+                      "mermaid.initialize({theme: 'neutral', securityLevel: 'loose'});\n"
+                      "</script>")))))
+#+end_src
+
+* Publish
+Simply use ~M-x org-blog-publish~ to start.
+
+* Incrementally Publishing
+Only the modified noes will be published, and only the relevant tags and assets will be handled.
+
+Note that index ~/~, ~archive/~ and ~tags/~ are always republished.
+
+* TODO
 - [ ] Preview in index page.
-- [ ] Publish the tags pages that involved.
-- [ ] Remove the published posts whose original ~.org~ file has gone.
-- [ ] Offer an API to clean out-of-date assets.
+- [X] Publish the tags pages that involved.
+- [X] Remove the published posts whose original ~.org~ file has gone.
+- [X] Offer an API to clean out-of-date assets.
 - [ ] RSS support.
-- [ ] More complicated enviroment of math support.
+- [X] More complicated enviroment of math support.
 - [X] Copy only assets refered in posts.
+- [X] Extract 3rd-party codes out.

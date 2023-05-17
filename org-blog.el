@@ -1,7 +1,8 @@
-;;; org-blog.el -*- lexical-binding: t; -*-
+;;; org-blog.el -*- lexical-binding: t -*-
 ;;; A simple org-mode based static blog generator 
 ;;; An fork from: https://github.com/bastibe/org-static-blog
 ;;; In order to integrate with `denote.el'
+
 ;; Author: Bastian Bechtold
 ;; Contrib: Shmavon Gazanchyan, Rafał -rsm- Marek, neeasade,
 ;; Michael Cardell Widerkrantz, Matthew Bauer, Winny, Yauhen Makei,
@@ -15,7 +16,7 @@
 ;; Author: Finger Knight
 ;; version: 0.0.1
 ;; URL:
-;; Package-Requires: ((emacs "28.2") (f.el) (dash.el) (s.el) (ts.el) (denote.el))
+;; Package-Requires: ((emacs "28.2") (f.el) (dash.el) (s.el) (denote.el))
 
 ;;; Commentary:
 
@@ -26,51 +27,83 @@
 (require 'dash)
 (require 'f)
 (require 's)
-(require 'ts)
 (require 'org)
 (require 'ox-html)
 (require 'denote)
 
 (defgroup org-blog nil
   "Settings for a static blog generator using org-mode"
-  :version "1.6.0"
+  :version "0.0.1"
   :group 'applications)
 
-(defcustom org-blog-publish-title "Example.com"
+(defcustom org-blog-meta-title "Org Blog"
   "Title of the blog."
   :type '(string)
   :safe t)
 
-(defcustom org-blog-publish-directory "~/blog/publish"
+(defcustom org-blog-meta-author "Author"
+  "Author of the blog."
+  :type '(string)
+  :safe t)
+
+(defcustom org-blog-meta-slogan "Personal fork of org-static-blog"
+  "Slogan showed in the home page."
+  :type '(string)
+  :safe t)
+
+(defcustom org-blog-publish-directory "~/blog"
   "Directory where published HTML files are stored.
 
 Only are files with non-nil `#+publish' contained"
   :type '(directory))
 
-(defcustom org-blog-posts-directory "~/blog/posts/"
-  "Directory where published ORG files are stored.
-When publishing, posts are rendered as HTML, and included in the
-index, archive, tags, and RSS feed."
+(defcustom org-blog-posts-directory "~/denote/"
+  "Directory where ORG files are stored."
   :type '(directory))
 
-(defcustom org-blog-static-directory "~/blog/static/"
-  "Directory where static resoureces are stored, like css, js.
-They will be copy to the same directory in publish directory."
+(defcustom org-blog-publish-posts-directory "post/"
+  "Directory where published posts are stored.
+
+A relative path to `org-blog-publish-directory'"
+  :type '(string))
+
+(defcustom org-blog-publish-archive-directory "archive/"
+  "Directory where save the index.html of archive page.
+
+A relative path to `org-blog-publish-directory'")
+
+(defcustom org-blog-publish-tag-directory "tags/"
+  "Directory where save the index.html of tag archive page.
+
+A relative path to `org-blog-publish-directory'")
+
+(defcustom org-blog-publish-tags-directory "tag/"
+  "Directory where published tags page are stored.
+
+A relative path to `org-blog-publish-directory'"
+  :type '(string))
+
+(defcustom org-blog-static-directory "~/denote/static/"
+  "Directory where static resoureces are stored, like css, js."
   :type '(directory))
 
-(defcustom org-blog-assets-directory "~/blog/assets/"
+(defcustom org-blog-publish-static-directory "static/"
+  "Directory saving the copy of static resoureces.
+
+A relative path to `org-blog-publish-directory'
+"
+  :type '(string))
+
+(defcustom org-blog-assets-directory "~/denote/assets/"
   "Directory where assets are stored, which are attachment
-in org file
-
-They will be copy to the same directory in publish directory."
+in org file."
   :type '(directory))
 
-(defcustom org-blog-index-file "index.html"
-  "File name of the blog landing page.
-The index page contains the most recent
-`org-blog-index-length` full-text posts."
-  :type '(string)
-  :safe t)
+(defcustom org-blog-publish-assets-directory "assets/"
+  "Directory saving the copy of assets.
+
+A relative path to `org-blog-publish-directory'"
+  :type '(string))
 
 (defcustom org-blog-index-length 5
   "Number of articles to include on index page."
@@ -81,24 +114,6 @@ The index page contains the most recent
   "Formatter of date."
   :type '(string)
   :safe t)
-
-(defcustom org-blog-archive-file "archive/index.html"
-  "File name of the list of all blog posts.
-The archive page lists all posts as headlines."
-  :type '(string)
-  :safe t)
-
-(defcustom org-blog-tags-file "tags/index.html"
-  "File name of the list of all blog posts by tag.
-The tags page lists all posts as headlines."
-  :type '(string)
-  :safe t)
-
-;; (defcustom org-blog-enable-tags nil
-;;   "Show tags below posts, and generate tag pages."
-;;   :group 'org-blog
-;;   :type '(boolean)
-;;   :safe t)
 
 (defcustom org-blog-rss-file "rss.xml"
   "File name of the RSS feed."
@@ -137,23 +152,34 @@ If nil (the default), all existing posts are included."
 ;; per-tag RSS feeds."
 ;;   :type '(boolean))
 
-(defcustom org-blog-page-head ""
+(defcustom org-blog-page-head-template
+  (list "<meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+        "<meta name=\"robots\" content=\"noodp\">\n"
+        (format "<meta name=\"author\" content=\" %s \">\n"
+                org-blog-meta-author)
+        "<meta name=\"referrer\" content=\"no-referrer\">")
   "HTML to put in the <head> of each page."
+  :type '(list string)
+  :safe t)
+
+(defcustom org-blog-page-header-template ""
+  "HTML put absolutely before of each page."
   :type '(string)
   :safe t)
 
-(defcustom org-blog-page-preamble ""
-  "HTML to put before the content of each page."
-  :type '(string)
+(defcustom org-blog-page-preamble-template nil
+  "HTML put before the content of each page."
+  :type '(list string)
   :safe t)
 
-(defcustom org-blog-page-postamble ""
-  "HTML to put after the content of each page."
-  :type '(string)
+(defcustom org-blog-page-postamble-template nil
+  "HTML put after the content of each page."
+  :type '(list string)
   :safe t)
 
-(defcustom org-blog-index-front-matter ""
-  "HTML to put at the beginning of the index page."
+(defcustom org-blog-page-footer-template "<center> The End </center>"
+  "HTML put absolutely after the content of each page."
   :type '(string)
   :safe t)
 
@@ -162,84 +188,170 @@ If nil (the default), all existing posts are included."
   :type '(string)
   :safe t)
 
-(defvar org-blog-post-filenames nil
-  "A list contains all the posts' abs filename.
+(defcustom org-blog-cache-file (f-expand "org-blog-cache.json"
+                                         default-directory)
+  "An JSON file to save the cache of publishing.
 
-Set the value before `org-blog-publish',
-then turn it to `nil' after finished.")
+For increasingly publishing, removing out-of-date HTML, etc.
+
+Default value is ~/.emacs.d/org-blog-cache.json"
+  :type '(string)
+  :safe t)
+
+(defcustom org-blog-third-party nil
+  "A list containing CONS object.
+
+Each CONS is ('module CONS), with another CONS like:
+(preamble-html . postamble-html).
+
+MODULE now support `math', `highlight', `mermaid'.
+PREAMBLE-HTML and POSTAMBLE-HTML are the scripts,
+when module is triggered, put content.
+
+PREAMBLE-HTML should contain style sheets, and
+POSTAMBLE-HTML should contain js script.
+")
+
+(defvar org-blog-cache nil
+  "Cache for publishing")
+
+(defvar org-blog-post-filenames nil
+  "A list contains all the posts' abs filename.")
 
 (defvar org-blog-post-filenames-without-special nil
   "A list contains all the posts' abs filename,
 whose value of `publish' is not \"special\".")
 
+(defvar org-blog-publishing-post nil
+  "The post's filename that is publishing now.")
+
+(defvar org-blog-publishing-post-assets nil
+  "The assets of post's filename that is publishing now.")
+
 (defvar org-blog-extras nil)
+
+(defvar org-blog-publish-posts nil
+  "Temporarily store posts needed to publish.")
+
+(defvar org-blog-publish-posts-remove nil
+  "Temporarily store posts needed to be removed.")
+
+(defvar org-blog-publish-tags nil
+  "Temporarily store tags needed to publish.")
+
+(defvar org-blog-publish-tags-remove nil
+  "Temporarily store tags needed to be removed.")
+
+(defvar org-blog-publish-assets nil
+  "Temporarily store assets needed to be copied.")
+
+(defvar org-blog-publish-assets-remove nil
+  "Temporarily store assets needed to be removed.")
+
+(defvar cache-archive-table nil
+  "A hash table containing all the posts,
+with their tags and last modificatio time.")
+
+(defvar cache-tags-table nil
+  "A hash table containing all the tags,
+with the posts' filename used it.")
+
+(defvar cache-static-table nil
+  "A hash table containing all the static files")
 
 (defvar org-blog-math-num nil
   "A list with two elements:
 One is the chapter number, which is a string.
 Another is the item number, which is a integer")
 
-(defun sort-file-recent (it other)
-  (ts> (org-blog-get-date it)
-       (org-blog-get-date other)))
+(defun keyhash (table)
+  "Return a list containing all the keys of `TABLE'."
+  (let ((keys nil))
+    (maphash #'(lambda (k v)
+                 (push k keys))
+             table)
+    (reverse keys)))
 
-(defun org-blog-template (title content &optional preamble postamble desc)
+(defun org-blog--sort-file-recent (it other)
+  "Sort posts by recent date. Inputs are IDs."
+  (> (org-blog-get-date it)
+     (org-blog-get-date other)))
+
+(defun org-blog-cache-read ()
+  "Read cache from JSON file."
+  (let ((json-object-type 'hash-table)
+        (json-array-type 'list)
+        (json-key-type 'string))
+    (unless (f-exists-p org-blog-cache-file)
+      (with-temp-file org-blog-cache-file
+        (insert "{"
+                "\"archive\": {}, "
+                " \"tags\": {}, "
+                "\"static\": {} "
+                "}")))
+    (json-read-file org-blog-cache-file)))
+
+(defun org-blog-cache-write ()
+  "Write cache to JSON file"
+  (let ((json-object-type 'hash-table)
+        (json-array-type 'list)
+        (json-key-type 'string))
+    (setq hhh org-blog-cache)
+    (f-write-text
+     (json-encode org-blog-cache)
+     ;; (json-serialize org-blog-cache)
+     'utf-8
+     org-blog-cache-file)))
+
+(defun org-blog-message (S &rest args)
+  "Output `S' into `*Org-Blog-Messages*' buffer with prefix `[Org Blog]'"
+  (apply #'message (cons (concat "[Org Blog] " S) args)))
+
+(defun org-blog--diff (actual-list cache-list)
+  "compare two list, return UPDATE-LIST and REMOVE-LIST"
+  (list
+   (-difference actual-list cache-list)
+   (-difference cache-list actual-list)))
+
+(defun org-blog-template (title content preamble postamble)
   "Create the template that is used to generate the static pages."
   (concat
    "<!DOCTYPE html>\n"
-   "<html lang=\"zh\">\n"
+   "<html>\n"
    "<head>\n"
-   "<meta charset=\"UTF-8\">\n"
-   (format "<meta name=\"description\" content=\"%s\">\n"
-           (or desc
-               org-blog-publish-description))
    ;; "<link rel=\"alternate\"\n"
    ;; "      type=\"application/rss+xml\"\n"
    ;; "      href=\"" (org-blog-get-absolute-url org-blog-rss-file) "\"\n"
    ;; "      title=\"RSS feed for " org-blog-publish-url "\">\n"
    "<title>" title "</title>\n"
-   org-blog-page-head
+   (apply #'s-concat org-blog-page-head-template)
    "</head>\n"
    "<body>\n"
    "<div class=\"header\">\n"
-   (org-blog-header-template)
+   org-blog-page-header-template
    "</div>\n"
    "<div class=\"main\">\n"
    "<div id=\"preamble\" class=\"status\">"
-   preamble
+   (apply #'concat preamble org-blog-page-preamble-template)
    "</div>\n"
    "<div id=\"content\">\n"
    content
    "</div>\n"
    "<div id=\"postamble\" class=\"status\">"
-   postamble
+   (apply #'concat postamble org-blog-page-postamble-template)
    "</div>\n"
    "</div>\n"
    "<div class=\"footer\">\n"
-   (org-blog-footer-template)
+   org-blog-page-footer-template
    "</div>\n"
    "</body>\n"
    "</html>\n"))
 
-(defun org-blog-header-template ()
-  (concat "<div class=\"home-page\">\n"
-          (format "<a href=\"/\">%s</a>" org-blog-publish-title)
-          "</div>"
-          "<div class=\"nav\">\n"
-          "<div class=\"nav item\">\n"
-          "<a href=\"/tags\">标签</a>\n"
-          "</div>\n"
-          "<div class=\"nav item\">\n"
-          "<a href=\"/archive\">归档</a>\n"
-          "</div>\n"
-          "<div class=\"nav item\">\n"
-          "<a href=\"/about\">关于</a>\n"
-          "</div>\n"
-          "</div>\n"))
-
-(defun org-blog-footer-template ()
-  (concat "<center> The End </center>"))
-
+(defun org-blog-get-all-posts ()
+  "Return a list of all posts' ID with `blog' or `blogsp' tag."
+  (--filter (-intersection '("blog" "blogsp") (org-blog-get-tags it t))
+            (-map #'denote-extract-id-from-string
+                  (f-files org-blog-posts-directory 'denote-file-is-note-p t))))
 
 (defun org-blog-get-post-filenames ()
   "Return a list of all posts with non-nil `publish' header."
@@ -248,20 +360,13 @@ Another is the item number, which is a integer")
                   (org-blog-get-tags it t))
    (f-files org-blog-posts-directory 'denote-file-is-note-p t)))
 
-(defun org-blog-needs-publish-p (post-filename)
-  "Check whether POST-FILENAME needs to publish."
-  (let ((pub-filename (org-blog-get-post-public-path post-filename)))
-    (or (not (f-exists-p pub-filename))
-        (file-newer-than-file-p post-filename
-                                pub-filename))))
-
-(defun org-blog-is-special-p (post-filename)
-  "Check whether POST-FILENAME is SPECIAL."
-  (member "blogsp" (org-blog-get-tags post-filename t)))
+(defun org-blog-is-special-p (post-id)
+  "Check whether post with POST-ID is SPECIAL."
+  (member "blogsp" (org-blog-get-tags post-id t)))
 
 (defun org-blog-matching-publish-filename (post-filename)
   "Generate HTML file name for POST-FILENAME."
-  (f-expand (org-blog-get-post-public-path post-filename)
+  (f-expand (org-blog-get-post-publish-path post-filename)
             org-blog-publish-directory))
 
 (defun org-blog-file-buffer (file)
@@ -295,42 +400,45 @@ existed before)."
        (switch-to-buffer current-buffer)
        result)))
 
-(defun org-blog-get-date (post-filename)
-  "Extract the `#+date:` from POST-FILENAME as date-time."
-  (let ((date-string (nth 1 (s-match "^\\#\\+date:[ ]*[<[]\\([^]>]+\\)[]>]"
-                                     (f-read post-filename)))))
-    (if date-string
-        (ts-parse-org date-string)
-      (ts-now))))
+(defun org-blog-get-path (post-id)
+  "Return the absolte path of post with POST-ID"
+  (denote-get-path-by-id post-id))
 
-(defun org-blog-get-title (post-filename)
-  "Extract the `#+title:` from POST-FILENAME."
-  (nth 1 (s-match "^\\#\\+title:[ ]*\\(.+\\)$"
-                  (f-read post-filename))))
+(defun org-blog-get-title (post-id)
+  "Return title of post with POST-ID"
+  (denote-retrieve-filename-title (denote-get-path-by-id post-id)))
 
-(defun org-blog-get-id (post-filename)
-  "Extract the `#+identifier:` from POST-FILENAME."
-  (if (org-blog-is-special-p post-filename)
-      (s-trim (nth 1 (s-match "^\\#\\+identifier:[ ]*\\(.+\\)$"
-                              (f-read post-filename))))
-    (denote-retrieve-filename-identifier (f-filename post-filename))))
+(defun org-blog-get-description (post-id)
+  "TODO: Generate description for post with POST-ID"
+  "")
 
-(defun org-blog-get-description (post-filename)
-  "Extract the `#+description:` from POST-FILENAME."
-  (nth 1 (s-match "^\\#\\+description:[ ]*\\(.+\\)$"
-                  (f-read post-filename))))
+(defun org-blog-get-location (post-id)
+  "Get `LOCATION' in front matter from special post."
+  (let* ((file (org-blog-get-path post-id))
+         (case-fold-search t)
+         (location (if file
+                       (nth 1
+                            (s-match "^\\#\\+location:\s*\\(.+\\)"
+                                     (f-read file)))
+                     (gethash "location" (gethash post-id cache-archive-table)))))
+    (or location "")))
 
-(defun org-blog-get-tags (post-filename &optional all)
-  "Extract tags from POST-FILENAME's path
+(defun org-blog-get-date (post-id)
+  "Get the last modified date (TIMESTAMP, INTEGER) of post with POST-ID"
+  (f-modification-time (org-blog-get-path post-id) 'seconds))
+
+(defun org-blog-get-tags (post-id &optional all)
+  "Extract tags from post with POST-iD.
 If ALL is `nil', then \"blog\" and \"blogsp\" are excluded."
-  (-difference (denote-extract-keywords-from-path post-filename)
+  (-difference (denote-extract-keywords-from-path
+                (denote-get-path-by-id post-id))
                (unless all '("blog" "blogsp"))))
 
-(defun org-blog-get-math-chapter (post-filename)
+(defun org-blog-get-math-chapter (post-id)
   "Get chapter number for mathametics."
   (or
    (car (s-match "\\([0-9]+\.\\)+"
-                 (org-blog-get-title post-filename)))
+                 (org-blog-get-title post-id)))
    ""))
 
 (defun org-blog-build-toc (content)
@@ -374,16 +482,16 @@ If ALL is `nil', then \"blog\" and \"blogsp\" are excluded."
        "\n")
     "</div>\n")))
 
-(defun org-blog-get-tag-tree ()
-  "Return an association list of tags to filenames.
-e.g. `(('foo' 'file1.org' 'file2.org') ('bar' 'file2.org'))`"
+(defun org-blog-get-tag-tree (posts)
+  "Return an association list of tags to posts.
+e.g. `(('tag1' 'id1' 'id2') ('tag2' 'id2'))`"
   (let ((tag-tree '()))
-    (dolist (post-filename org-blog-post-filenames-without-special)
-      (dolist (tag (-difference (org-blog-get-tags post-filename)
+    (dolist (post-id posts)
+      (dolist (tag (-difference (org-blog-get-tags post-id)
                                 org-blog-rss-excluded-tag))
         (if (assoc-string tag tag-tree t)
-            (push post-filename (cdr (assoc-string tag tag-tree t)))
-          (push (cons tag (list post-filename)) tag-tree))))
+            (push post-id (cdr (assoc-string tag tag-tree t)))
+          (push (cons tag (list post-id)) tag-tree))))
     tag-tree))
 
 (defun org-blog--preview-region ()
@@ -421,37 +529,38 @@ Preamble and Postamble are excluded, too."
        (search-backward "<div id=\"comments\">" nil t)
        (point)))))
 
-(defun org-blog-get-post-relative-url (post-filename)
+(defun org-blog-get-post-relative-url (post-id)
   "Returns absolute URL to the published POST-FILENAME.
 
 This function concatenates publish URL and generated custom filepath to the
 published HTML version of the post."
-  (concat "/"
+  (f-join "/"
           (f-relative
-           (f-dirname (org-blog-get-post-public-path post-filename))
+           (f-dirname (org-blog-get-post-publish-path post-id))
            org-blog-publish-directory)))
 
-(defun org-blog-get-post-public-path (post-filename)
+(defun org-blog-get-post-publish-path (post-id)
   "Returns post relative filepath in public directory."
   (f-join org-blog-publish-directory
-          (if (org-blog-is-special-p post-filename)
-              ""
-            "post")
-          (org-blog-get-id post-filename)
+          (if (org-blog-is-special-p post-id)
+              (org-blog-get-location post-id)
+            (format "%s/%s"
+                    org-blog-publish-posts-directory
+                    post-id))
           "index.html"))
 
-(defun org-blog-render-post-content (post-filename)
+(defun org-blog-render-post-content (post-id)
   "Render blog content as bare HTML without header."
   (let ((org-html-doctype "html5")
         (org-html-html5-fancy t))
     (save-excursion
       (let ((current-buffer (current-buffer))
-            (buffer-exists (org-blog-file-buffer post-filename))
+            (buffer-exists (org-blog-file-buffer (org-blog-get-path post-id)))
             (result nil))
         (with-temp-buffer
           (if buffer-exists
               (insert-buffer-substring buffer-exists)
-            (insert-file-contents post-filename))
+            (insert-file-contents (org-blog-get-path post-id)))
           (org-mode)
           (goto-char (point-min))
           (org-map-entries
@@ -464,34 +573,36 @@ published HTML version of the post."
           (switch-to-buffer current-buffer)
           result)))))
 
-(defun org-blog-assemble-index ()
-  "Assemble the blog index page.
+(defun org-blog-assemble-index (posts)
+  "Assemble the blog index page with given POSTS.
 The index page contains the last `org-blog-index-length`
 posts as full text posts."
+  (org-blog-message "Generating index.html...")
   (org-blog-assemble-multipost-page
-   (f-expand org-blog-index-file org-blog-publish-directory)
-   (-slice (-sort #'sort-file-recent
-                  org-blog-post-filenames-without-special)
+   (f-expand "index.html" org-blog-publish-directory)
+   (-slice (-sort #'org-blog--sort-file-recent
+                  posts)
            0
            org-blog-index-length)
-   org-blog-index-front-matter
+   (format "<div class=\"index-desc\">\n<center> %s </center>\n</div>\n"
+           org-blog-meta-slogan)
    nil
    t))
 
-(defun org-blog-assemble-multipost-page (pub-filename post-filenames &optional preamble postamble preview)
+(defun org-blog-assemble-multipost-page (pub-filename post-ids preamble postamble &optional preview)
   "Assemble a page that contains multiple posts one after another.
 Posts are sorted in descending time."
   (org-blog-with-find-file
    pub-filename
    (org-blog-template
-    org-blog-publish-title
-    (mapconcat (if preview 'org-blog-get-preview 'org-blog-get-post-summary)
-               (-sort #'sort-file-recent post-filenames)
+    org-blog-meta-title
+    (mapconcat (if preview 'org-blog-get-preview 'org-blog-publish-post-summary)
+               (-sort #'org-blog--sort-file-recent post-ids)
                "")
      preamble
      postamble)))
 
-(defun org-blog-post-preamble (post-filename &optional toc)
+(defun org-blog-post-preamble (post-id &optional toc)
   "Returns the formatted date and headline of the post.
 This function is called for every post and prepended to the post body.
 Modify this function if you want to change a posts headline.
@@ -506,26 +617,26 @@ in which date and tags won't be shown."
     "\n")
    toc
    "<h1 class=\"post-title\"> "
-   (org-blog-get-title post-filename)
+   (org-blog-get-title post-id)
    " </h1>\n"
    (when toc
      (concat
-      (ts-format
+      (format-time-string
        (concat "<div class=\"post-date\">"
                org-blog-date-format
                "</div>\n")
-       (org-blog-get-date post-filename))
+       (org-blog-get-date post-id))
       
       "<div class=\"taglist\">"
-      (org-blog-post-taglist post-filename)
+      (org-blog-post-taglist post-id)
       "\n</div>\n"))))
 
-(defun org-blog-post-taglist (post-filename)
+(defun org-blog-post-taglist (post-id)
   "Returns the tag list of the post.
 This part will be attached at the end of the post, after
 the taglist, in a <div id=\"taglist\">...</div> block."
   (let ((taglist-content "")
-        (tags (-difference (org-blog-get-tags post-filename)
+        (tags (-difference (org-blog-get-tags post-id)
                            org-blog-rss-excluded-tag)))
     (when tags
       (mapconcat
@@ -535,7 +646,7 @@ the taglist, in a <div id=\"taglist\">...</div> block."
                  tag))
        tags "\n"))))
 
-(defun org-blog-post-postamble (post-filename)
+(defun org-blog-post-postamble (post-id)
   "Returns the tag list and comment box at the end of a post.
 This function is called for every post and the returned string is
 appended to the post body, and includes the tag list generated by
@@ -561,7 +672,7 @@ followed by the HTML code for comments."
 (defun org-blog--write-rss (items &optional tag)
   "Generates an RSS file for the given TAG, or for all tags is TAG is nil."
   (let ((title (format "%s%s"
-                       org-blog-publish-title
+                       org-blog-meta-title
                        (if tag (concat " - " tag) "")))
         (url (format "%s%s"
                      org-blog-publish-url
@@ -603,7 +714,7 @@ machine-readable format."
                 (let ((items (cons item (cdr (assoc tag rss-tag-items)))))
                   (setf (alist-get tag rss-tag-items nil t 'string=) items))))))))
     (org-blog--write-rss rss-items)
-    (message "%s" rss-tag-items)
+    (org-blog-message "%s" rss-tag-items)
     (dolist (x rss-tag-items) (org-blog--write-rss (cdr x) (car x)))))
 
 (defun org-blog-get-rss-item (post-filename)
@@ -633,21 +744,25 @@ The HTML content is taken from the rendered HTML post."
    "</pubDate>\n"
    "</item>\n"))
 
-(defun org-blog-assemble-archive ()
-  "Re-render the blog archive page.
+(defun org-blog-assemble-archive (posts)
+  "Render the blog archive page with given POSTS.
 The archive page contains single-line links and dates for every
 blog post, but no post body."
+  (org-blog-message "Generating Archive page.")
   (org-blog-with-find-file
-   (f-expand org-blog-archive-file org-blog-publish-directory)
+   (f-join org-blog-publish-directory
+           org-blog-publish-archive-directory
+           "index.html")
    (org-blog-template
-    (format "ARCHIVEs - %s" org-blog-publish-title)
-    (mapconcat 'org-blog-get-post-summary
-               (-sort #'sort-file-recent
-                      org-blog-post-filenames-without-special)
+    (format "ARCHIVEs - %s" org-blog-meta-title)
+    (mapconcat 'org-blog-publish-post-summary
+               (-sort #'org-blog--sort-file-recent
+                      posts)
                "")
-    (concat "<h1 class=\"post-title\"> ARCHIVEs </h1>"))))
+    (concat "<h1 class=\"post-title\"> ARCHIVEs </h1>")
+    nil)))
 
-(defun org-blog-get-post-summary (post-filename &optional with-tags)
+(defun org-blog-publish-post-summary (post-id &optional with-tags)
   "Assemble post summary for an archive page.
 This function is called for every post on the archive and
 tags-archive page. Modify this function if you want to change an
@@ -656,12 +771,12 @@ archive headline."
    "<div class=\"summary-item\">"
    "<div class=\"summary-title\">"
    (format "<a href=\"%s\"> %s </a>"
-           (org-blog-get-post-relative-url post-filename)
-           (org-blog-get-title post-filename))
+           (org-blog-get-post-relative-url post-id)
+           (org-blog-get-title post-id))
    "</div>\n"
    "<div class=\"summary-date\">"
-   (ts-format org-blog-date-format
-              (org-blog-get-date post-filename))
+   (format-time-string org-blog-date-format
+              (org-blog-get-date post-id))
    "</div>"
    
    "</div>\n"))
@@ -669,71 +784,153 @@ archive headline."
 (defun org-blog-assemble-tags-archive-tag (tag)
   "Assemble single TAG for all filenames."
   (let ((tag-name (car tag))
-        (post-filenames (cdr tag)))
+        (post-ids (cdr tag)))
     (format "<a class=\"tag-item\" href=\"%s\"> %s<sup>%s </sup></a>\n"
             (concat "/tag/" (downcase tag-name))
             tag-name
-            (length post-filenames))))
+            (length post-ids))))
 
-(defun org-blog-assemble-tags-archive ()
-  "Assemble the blog tag archive page.
-The archive page contains single-line links and dates for every
-blog post, sorted by tags, but no post body."
-  (message "Assembling TAGs Page")
-  (org-blog-with-find-file
-   (f-expand org-blog-tags-file org-blog-publish-directory)
-   (org-blog-template
-    (format "TAGs - %s" org-blog-publish-title)
-    (mapconcat
-     'org-blog-assemble-tags-archive-tag
-     (--sort (s-less-p (car it) (car other))
-             (org-blog-get-tag-tree))
-     "")
-    "<h1 class=\"post-title\"> TAGs </h1>\n")))
-
-(defun org-blog-get-preview (post-filename)
+(defun org-blog-get-preview (post-id)
   "Get title, date, tags from POST-FILENAME and get the first paragraph from the rendered HTML."
-  (let ((post-title (org-blog-get-title post-filename))
-        (post-date (org-blog-get-date post-filename))
-        (post-taglist (org-blog-post-taglist post-filename))
+  (let ((post-title (org-blog-get-title post-id))
+        (post-date (org-blog-get-date post-id))
+        (post-taglist (org-blog-post-taglist post-id))
         (preview-region
          (with-temp-buffer
-           (insert-file-contents (org-blog-get-post-public-path post-filename))
+           (insert-file-contents (org-blog-get-post-publish-path post-id))
            (org-blog--preview-region))))
     ;; Put the substrings together.
     (concat
      "<div class=\"post-item\">\n"
      (format "<h2 class=\"post-title\"><a href=\"%s\"> %s </a></h2>"
-             (org-blog-get-post-relative-url post-filename)
+             (org-blog-get-post-relative-url post-id)
              post-title)
      preview-region
      (format "<div class=\"post-info\">\n%s\n%s\n</div>\n"
              (format "<div class=\"taglist\">%s</div>\n" post-taglist)
-             (ts-format (concat "<div class=\"post-date\">"
+             (format-time-string (concat "<div class=\"post-date\">"
                                 org-blog-date-format
                                 "</div>")
                         post-date))
      "</div>\n")))
 
-(defun org-blog-assemble-tags ()
-  "Render the tag archive and tag pages."
-  (org-blog-assemble-tags-archive)
-
-  (--each (org-blog-get-tag-tree)
-    (org-blog-assemble-multipost-page
-     (f-join org-blog-publish-directory
-             "tag"
-             (downcase (car it))
+(defun org-blog-assemble-tags (posts)
+  "Assemble the blog tag archive page with given POSTS.
+The archive page contains single-line links and dates for every
+blog post, sorted by tags, but no post body."
+  (org-blog-message "Generating Tags index page")
+  (org-blog-with-find-file
+   (f-join org-blog-publish-directory
+             org-blog-publish-tag-directory
              "index.html")
-     (cdr it)
-     (concat "<h1 class=\"post-title\"> TAG: #" (car it) " </h1>"))))
+   (org-blog-template
+    (format "TAGs - %s" org-blog-meta-title)
+    (mapconcat
+     'org-blog-assemble-tags-archive-tag
+     (--sort (s-less-p (car it) (car other))
+             (org-blog-get-tag-tree posts))
+     "")
+    "<h1 class=\"post-title\"> TAGs </h1>\n"
+    nil)))
 
-(defun org-blog-copy-directory (string)
-      (f-delete (f-expand (f-base string)
-                          org-blog-publish-directory)
-                t)
-      (f-copy (f-expand string org-blog-posts-directory)
-              org-blog-publish-directory))
+(defun org-blog-publish-tag (tag)
+  "Publish a single TAG page."
+  (org-blog-assemble-multipost-page
+   (f-join org-blog-publish-directory
+           org-blog-publish-tags-directory
+           (downcase tag)
+           "index.html")
+   (gethash tag cache-tags-table)
+   (concat "<h1 class=\"post-title\"> TAG: #" tag " </h1>")
+   nil))
+
+(defun org-blog-handle-static ()
+  "Copy or delete static files increasingly."
+  (org-blog-message "Handling static files")
+  (let ((cache-static-table (gethash "static" org-blog-cache))
+        (static-files (--map
+                       (f-relative it org-blog-static-directory)
+                       (f-files org-blog-static-directory nil t))))
+    (maphash
+     #'(lambda (static-file lastmod)
+         (let ((static-file-dst
+                (f-join org-blog-publish-directory
+                        org-blog-publish-static-directory
+                        static-file)))
+         
+           (if (-elem-index static-file static-files)
+               (let* ((static-file-src
+                       (f-expand static-file org-blog-static-directory))
+                      (new-lastmod (f-modification-time static-file-src
+                                                        'seconds)))
+                 (when (> new-lastmod
+                          lastmod)
+                   (puthash static-file new-lastmod cache-static-table)
+                   (when (f-exists-p static-file-dst)
+                     (f-delete static-file-dst))
+                   (org-blog-message "Copying static: %s" static-file-dst)
+                   (f-mkdir (f-dirname static-file-dst))
+                   (copy-file static-file-src static-file-dst t)))
+
+             ;; out-of-date
+             (org-blog-message "Removing static: %s" static-file-dst)
+             (when (f-exists-p static-file-dst)
+               (f-delete static-file-dst))
+             (remhash static-file cache-static-table))
+           (setq static-files
+                 (-remove-item static-file static-files))))
+     cache-static-table)
+
+    ;; new
+    (--each static-files
+      (let* ((src (f-expand it org-blog-static-directory))
+             (dst (f-join org-blog-publish-directory
+                          org-blog-publish-static-directory
+                          it))
+             (lastmod (f-modification-time src 'seconds)))
+        (puthash it lastmod cache-static-table)
+        (org-blog-message "Copying static: %s" dst)
+        (f-mkdir (f-dirname dst))
+        (copy-file src dst t)))))
+
+(defun org-blog-handle-asset ()
+  "Copy or delete asset files increasingly."
+  (org-blog-message "Handling asset files")
+  (let ((all-assets
+         (let ((lst nil))
+           (maphash #'(lambda (post data-table)
+                        (setq lst (-union lst (gethash "asset" data-table))))
+                    cache-archive-table)
+           lst))
+        (copy-assets org-blog-publish-assets)
+        (remove-assets org-blog-publish-assets-remove)
+        
+        (published-assets
+         (-map #'f-filename
+               (f-files (f-expand org-blog-publish-assets-directory
+                                  org-blog-publish-directory)))))
+
+    ;; update assets
+    (--each copy-assets
+      (let ((src (f-expand it org-blog-assets-directory))
+            (dst (f-join org-blog-publish-directory
+                         org-blog-publish-assets-directory
+                         (format "%s.%s"
+                                 (md5 (f-no-ext it))
+                                 (f-ext it)))))
+        (org-blog-message "Copying asset: %s" it)
+        (copy-file src dst t)))
+
+    ;; remove out-of-date assets
+    (--each (-difference remove-assets all-assets)
+      (let ((abs-path (f-join org-blog-publish-directory
+                        org-blog-publish-assets-directory
+                        (format "%s.%s"
+                                (md5 (f-no-ext it))
+                                (f-ext it)))))
+        (org-blog-message "Removing asset: %s" it)
+        (when (f-exists-p abs-path)
+          (f-delete abs-path))))))
 
 ;;; template
 (setq org-html-footnotes-section
@@ -921,48 +1118,43 @@ holding contextual information."
                        code))))))
 
 (defun org-blog-html-quote-block (quote-block contents info)
-  "Add author."
-  (setq string contents)
+  "Add author and reference.
+
+By using `#+attr_html: :from [ref] :by [author] before quote block.'
+"
   (format "<blockquote%s>\n%s</blockquote>"
 	  (let* ((reference (org-html--reference quote-block info t))
-		     (attributes (org-export-read-attribute :attr_html quote-block))
-		     (a (org-html--make-attribute-string
-		         (if (or (not reference)
-                         (plist-member attributes :id))
+		     (attributes
+              (let* ((attr (org-export-read-attribute :attr_html
+                                                      quote-block))
+                     (from (plist-get attr :from))
+                     (by (plist-get attr :by)))
+                (plist-put attr :from nil)
+                (plist-put attr :by nil)
+                (when (or from by)
+                  (setq contents
+                        (s-append (concat  "<p class=\"quote-source\">"
+                                           " &#x2014;&#x2014; "
+                                           by
+                                           (when (and from by)
+                                             ", ")
+                                           from
+                                           " </p>\n")
+                                  contents)))
+                attr))
+             (a (org-html--make-attribute-string
+		         (if (or (not reference) (plist-member attributes :id))
 			         attributes
 		           (plist-put attributes :id reference)))))
-	    (if (org-string-nw-p a)
-            (concat " " a) ""))
-      (let ((p-list nil)
-            (source nil))
-        (with-temp-buffer
-          (insert "\n"
-                  contents)
-          (beginning-of-buffer)
-          (while (search-forward "<p>" nil t 1)
-            (let ((start-point (point)))
-              (search-forward "</p>" nil t 1)
-              (backward-char 4)
-              (push (s-trim (buffer-substring-no-properties start-point (point)))
-                    p-list))))
-        (when (s-starts-with-p "&#x2014;" (car p-list))
-          (setq source (s-trim (s-replace "&#x2014;" "" (car p-list)))))
-        (concat
-         (mapconcat
-          (lambda (it)
-            (format "<p> %s </p>" it))
-          (reverse (cdr p-list)) "\n")
-         (if source
-             (format "<p class=\"quote-source\"> - %s </p>\n"
-                     source)
-           (format "<p> %s </p>" (car p-list)))))))
-
+	    (if (org-string-nw-p a) (concat " " a) ""))
+	  contents))
+             
 (defun org-blog-html-paragraph (paragraph contents info)
   "Transcode a PARAGRAPH element from Org to HTML.
 CONTENTS is the contents of the paragraph, as a string.  INFO is
 the plist used as a communication channel.
 
-ps. 1. Remove spaces at the side of strong cn words.
+ps. 1. Remove spaces at the side of strong Chinese words.
 2. Remove `figure-number'."
   (let* ((parent (org-export-get-parent paragraph))
 	     (parent-type (org-element-type parent))
@@ -1056,61 +1248,54 @@ Remove `table-number'."
 	          (funcall table-column-specs table info)
 	          contents))))
 
-(defun org-blog-link-handler (link)
-  (let ((is-image (s-match
-                   "\\(<img.*src=\"\\)\\([^\"]*\\)\\(\"[^>]*>.*\\)"
-                   link))
-        (is-a (s-match
+(defun org-blog--advice-link (link)
+  (let ((a-matched (s-match
                "\\(<a.*href=\"\\)\\([^\"]*\\)\\(\"[^>]*>.*\\)"
                link)))
-    (cond
-     (is-image
-      (seq-let (_ before src after) is-image
-        (let ((cp-src (f-expand src org-blog-assets-directory))
-              (cp-dst (f-expand src (f-expand (f-relative org-blog-assets-directory
-                                                         org-blog-posts-directory)
-                                              org-blog-publish-directory))))
-          (when (f-exists-p cp-dst)
-            (f-delete cp-dst))
-          (f-copy cp-src cp-dst))
-        (setq src (f-expand src "/assets"))
-        (format "<a href=\"%s\" target=\"_blank\">%s</a>"
-                src
-                (concat before src after))))
-     
-     (is-a
-      (seq-let (_ before href after) is-a 
-        (if (--any-p (s-starts-with-p it href)
-                     '("http" "#"))
-            ;; A hack way to add `target'
-            (unless (s-starts-with-p "#" href)
-              (setq href (concat href "\" target=\"_blank")))
-          
-          ;; local file
-          ;; start with one or more `../'
-          (setq href (s-replace-regexp "^\\(\.\./\\)+\\(.*\\)"
-                                       "/post/\\2"
-                                       href))
-          
-          ;; start with `org-blog-posts-directory'
-          (setq href (s-replace-regexp
-                      (format "^%s/\\(.*\\)"
-                              (f-base org-blog-posts-directory))
-                      "/post/\\1"
-                      href))
+    (if a-matched
+      (seq-let (_ before href after) a-matched
+        ;; A hack way to add `target'
+        (unless (s-starts-with-p "#" href)
+          (setq after (concat "\" target=\"_blank" after)))
+        ;; local file, only consider `.org' files
+        (let ((post-id (denote-extract-id-from-string href)))
+          (when (and post-id
+                     (not (or (s-starts-with-p "#" href)
+                              (org-url-p href))))
+            (setq href (f-join "/"
+                               org-blog-publish-posts-directory
+                               post-id))))
+        (concat before href after))
+      link)))
 
-          ;; Else, assume they are in the same directory
-          (setq href (concat "/post/" href))
-          
-          (when (f-ext href "html")
-            (setq href (f-no-ext href))))
-        (concat before href after)))
-     
-     (t link))))
+(defun org-blog--advice-image (func &rest rest)
+  "Fix image's src to be relative to`org-blog-publish-assets-directory',
+and wrap <img> into a <a> source attributes info"
+  (let* ((src (car rest))
+         (image-abs-path (f-expand src
+                                   (f-dirname org-blog-publishing-post)))
+         (rel-src (f-relative image-abs-path
+                              org-blog-assets-directory))
+         (new-src (f-join "/"
+                          org-blog-publish-assets-directory
+                          (format "%s.%s"
+                                  (md5 (f-no-ext rel-src))
+                                  (f-ext rel-src)))))
+    (push (f-relative image-abs-path
+                      org-blog-assets-directory)
+          org-blog-publishing-post-assets)
+    
+    (format "<a href=\"%s\" target=\"_blank\">%s</a>"
+            new-src
+            (apply func (cons new-src (cdr rest))))))
 
 (advice-add 'org-html-link
             :filter-return
-            'org-blog-link-handler)
+            'org-blog--advice-link)
+
+(advice-add 'org-html--format-image
+            :around
+            'org-blog--advice-image)
 
 ;; Tempororally
 (advice-add 'org-html-format-latex
@@ -1118,74 +1303,6 @@ Remove `table-number'."
             (lambda (latex-frag processing-type info)
               (when (eq processing-type 'mathjax)
                 (add-to-list 'org-blog-extras 'math))))
-
-;;; 3rd-party
-(defvar org-blog-third-party
-  (list
-   (cons 'math
-         (cons
-          "<link rel=\"stylesheet\" href=\"/static/katex/katex.min.css\">"
-          (concat "<script defer src=\"/static/katex/katex.min.js\"></script>\n"
-                     "<script defer src=\"/static/katex/auto-render.min.js\"></script>\n"
-                     "<script>\n"
-                     "let macros = {
-\"\\\\C\": \"\\\\mathbb{C}\",
-\"\\\\N\": \"\\\\mathbb{N}\",
-\"\\\\Q\": \"\\\\mathbb{Q}\",
-\"\\\\R\": \"\\\\mathbb{R}\",
-\"\\\\Z\": \"\\\\mathbb{Z}\",
-\"’\": \"'\"
-};\n"
-                     "document.addEventListener(\"DOMContentLoaded\", function() {
-renderMathInElement(document.getElementById(\"content\"), {
-strict: false,
-delimiters: [
-{\"display\": true,\"left\": \"$$\",\"right\": \"$$\"},
-{\"display\": true,\"left\": \"\\\\[\",\"right\": \"\\\\]\"},
-{\"display\": true,\"left\": \"\\\\begin{equation}\",\"right\": \"\\\\end{equation}\"},
-{\"display\": true,\"left\": \"\\\\begin{equation*}\",\"right\": \"\\\\end{equation*}\"},
-{\"display\": true,\"left\": \"\\\\begin{align}\",\"right\": \"\\\\end{align}\"},
-{\"display\": true,\"left\": \"\\\\begin{align*}\",\"right\": \"\\\\end{align*}\"},
-{\"display\": true,\"left\": \"\\\\begin{alignat}\",\"right\": \"\\\\end{alignat}\"},
-{\"display\": true,\"left\": \"\\\\begin{alignat*}\",\"right\": \"\\\\end{alignat*}\"},
-{\"display\": true,\"left\": \"\\\\begin{gather}\",\"right\": \"\\\\end{gather}\"},
-{\"display\": true,\"left\": \"\\\\begin{CD}\",\"right\": \"\\\\end{CD}\"},
-{\"display\": false,\"left\": \"$\",\"right\": \"$\"},
-{\"display\": false,\"left\": \"\\\\(\",\"right\": \"\\\\)\"}
-],
-macros});})\n"
-                     "</script>")))
-
-   (cons 'highlight
-         (cons
-          "<link rel=\"stylesheet\" href=\"/static/highlight/dracula.css\">"
-          (concat "<script src=\"/static/highlight/highlight.min.js\"></script>\n"
-                  "<script>\n"
-                  "Array.from(document.querySelectorAll('#content pre')).forEach(
-node => {
-let codeElement = node.querySelector(\"code\"),
-    excludes = [\"mermaid\"];
-
-if (!codeElement){
-return
-}
-let language = codeElement.getAttribute(\"class\").split(\"-\")[1];
-if (excludes.includes(language)) {
-return
-}
-
-hljs.highlightElement(codeElement);
-});\n"
-                  "</script>")))
-
-   (cons 'mermaid
-         (cons
-          ""
-          (concat "<script src=\"/static/mermaid/mermaid.min.js\"></script>\n"
-                  "<script>\n"
-                  "mermaid.initialize({theme: 'neutral', securityLevel: 'loose'});\n"
-                  "</script>")))
-    ))
 
 (org-export-define-derived-backend 'org-blog-post-backend 'html
   :translate-alist '((template . (lambda (contents info) contents))
@@ -1196,56 +1313,207 @@ hljs.highlightElement(codeElement);
                      (paragraph . org-blog-html-paragraph)
                      (table . org-blog-html-table)))
 
-;;;###autoload
-(defun org-blog-publish-file (post-filename)
-  "Publish a single POST-FILENAME.
-The index, archive, tags, and RSS feed are not updated."
-  (interactive "f")
-  (message "Publishing: %s" post-filename)
+(defun org-blog-remove-published-file (post-id)
+  "Remove published post."
+  (let* ((cache-post (gethash post-id cache-archive-table))
+         (remove-tags (gethash "tag" cache-post))
+         (remove-assets (gethash "asset" cache-post))
+         (location (gethash "location" cache-post)))
+    (org-blog-message "Removing post: %s" (gethash "title" cache-post))
+
+    (remhash post-id cache-archive-table)
+    (f-delete (f-join org-blog-publish-directory
+                      (if (length= location 0)
+                          (format "%s/%s"
+                                  org-blog-publish-posts-directory
+                                  post-id)
+                        location))
+              t)
+
+    (--each remove-tags
+      (let ((new-lst (-remove-item post-id
+                                   (gethash it cache-tags-table))))
+        (if new-lst
+            (puthash it new-lst cache-tags-table)
+          ;; empty tags
+          (push it org-blog-publish-tags-remove))))
+
+    (setq org-blog-publish-assets-remove
+          (-union org-blog-publish-assets-remove
+                  remove-assets))))
+
+(defun org-blog-remove-published-tag (tag)
+  "Remove published tag"
+  (let* ((cache-tag (gethash tag cache-tags-table)))
+    (remhash tag cache-tags-table)
+    (org-blog-message "Removing tag: %s" tag)
+    (f-delete (f-join org-blog-publish-directory
+                      org-blog-publish-tags-directory
+                      tag)
+              t)))
+
+(defun org-blog-publish-file (post-id)
+  "Publish a single post with POST-ID."
+  (org-blog-message "Publishing: %s" (org-blog-get-title post-id))
+  
   (let* ((org-blog-extras nil)
-         (org-blog-math-num (list (org-blog-get-math-chapter post-filename)
+         (org-blog-publishing-post (org-blog-get-path post-id))
+         (org-blog-publishing-post-assets nil)
+         (org-blog-math-num (list (org-blog-get-math-chapter post-id)
                                   0))
-         (content (org-blog-render-post-content post-filename))
-         (toc (unless (org-blog-is-special-p post-filename)
-                (org-blog-build-toc content))))
-    (message "Content generated.")
+         (content (org-blog-render-post-content post-id))
+         (toc (unless (org-blog-is-special-p post-id)
+                (org-blog-build-toc content)))
+         (cache-post (gethash post-id cache-archive-table)))
+
+    (puthash "title" (org-blog-get-title post-id) cache-post)
+    (puthash "lastmod" (org-blog-get-date post-id) cache-post)
+    (puthash "location" (org-blog-get-location post-id) cache-post)
+
+    ;; handler tags
+    (let ((post-tags (org-blog-get-tags post-id)))
+      (seq-let (update-tags remove-tags)
+          (org-blog--diff post-tags (gethash "tag" cache-post))
+        (--each update-tags
+          (let ((cache-posts-in-tag (gethash it cache-tags-table)))
+            (puthash it
+                     (-snoc cache-posts-in-tag post-id)
+                     cache-tags-table))
+          (push it org-blog-publish-tags))
+
+        (--each remove-tags
+          (let* ((cache-posts-in-tag (-remove-item post-id
+                                                   (gethash it cache-tags-table))))
+            (unless cache-posts-in-tag
+              (push it org-blog-publish-tags-remove))
+            (puthash it
+                     cache-posts-in-tag
+                     cache-tags-table))))
+      
+      (puthash "tag" post-tags cache-post))
+    
+    ;; handler assets
+    (seq-let (update-assets remove-assets)
+        (org-blog--diff org-blog-publishing-post-assets
+                        (gethash "asset" cache-post))
+      (setq org-blog-publish-assets
+            (-union org-blog-publish-assets
+                    update-assets)
+            
+            org-blog-publish-assets-remove
+            (-union org-blog-publish-assets-remove
+                    remove-assets))
+      (puthash "asset" org-blog-publishing-post-assets cache-post))
+
+    ;; Writing output file
     (org-blog-with-find-file
-     (org-blog-get-post-public-path post-filename)
+     (org-blog-get-post-publish-path post-id)
      (org-blog-template
-      (org-blog-get-title post-filename)
+      (format "%s - %s"
+              (org-blog-get-title post-id)
+              org-blog-meta-title)
       content
-      (org-blog-post-preamble post-filename toc)
-      (org-blog-post-postamble post-filename)
-      (org-blog-get-description post-filename)))))
+      (org-blog-post-preamble post-id toc)
+      (org-blog-post-postamble post-id)))))
 
 ;;;###autoload
-(defun org-blog-publish (&optional force-render)
+(defun org-blog-publish ()
   "Render all blog posts, the index, archive, tags, and RSS feed.
 Only blog posts that changed since the HTML was created are
-re-rendered.
+re-rendered."
+  (interactive)
+  (org-blog-message "Start to publish...")
+  
+  ;; Preprocessing
+  (f-mkdir org-blog-publish-directory
+           (f-expand "archive" org-blog-publish-directory)
+           (f-expand "assets" org-blog-publish-directory)
+           (f-expand "static" org-blog-publish-directory)
+           (f-expand "post" org-blog-publish-directory)
+           (f-expand "tag" org-blog-publish-directory)
+           (f-expand "tags" org-blog-publish-directory))
+  (org-blog-message "Structure built")
+  
+  (let* ((org-blog-all-posts (org-blog-get-all-posts))
+         (org-blog-normal-posts
+          (--filter (not (org-blog-is-special-p it))
+                    org-blog-all-posts))
+         (org-blog-cache (org-blog-cache-read))
+         (cache-archive-table (gethash "archive" org-blog-cache))
+         (cache-tags-table (gethash "tags" org-blog-cache))
+         (org-blog-publish-posts nil)
+         (org-blog-publish-posts-remove nil)
+         (org-blog-publish-tags nil)
+         (org-blog-publish-tags-remove nil)
+         (org-blog-publish-assets nil)
+         (org-blog-publish-assets-remove nil)
+         (new-posts org-blog-all-posts))
 
-With a prefix argument, all blog posts are re-rendered
-unconditionally."
-  (interactive "P")
-  (let* ((org-blog-post-filenames (org-blog-get-post-filenames))
-         (org-blog-post-filenames-without-special (--filter
-                                                   (not (org-blog-is-special-p it))
-                                                   org-blog-post-filenames)))
-    (--map-when
-        (or force-render
-            (org-blog-needs-publish-p it))
-      (org-blog-publish-file it)
-      org-blog-post-filenames)
+    (org-blog-message "Total posts: %d -- Normal posts: %d. Special posts: %d"
+                      (length org-blog-all-posts)
+                      (length org-blog-normal-posts)
+                      (- (length org-blog-all-posts)
+                         (length org-blog-normal-posts)))
+
+    (--each (keyhash cache-archive-table)
+      (let ((cache-post (gethash it cache-archive-table)))
+        (if (-elem-index it org-blog-all-posts)
+            ;; Existed posts
+            (progn
+              (when (> (org-blog-get-date it)
+                       (gethash "lastmod" cache-post))
+                ;; Newer
+                (push it org-blog-publish-posts))
+              ;; remove all exxisted posts from new-`posts'
+              (setq new-posts (-remove-item it new-posts)))
+          ;; out-of-date posts
+          (push it org-blog-publish-posts-remove))))
+
+    ;; new posts
+    (--each new-posts
+      (let ((cache-post (make-hash-table :test 'equal)))
+        (push it org-blog-publish-posts)
+        (puthash it cache-post cache-archive-table)))
     
-    (org-blog-assemble-index)
-    ;; (org-static-blog-assemble-rss)
-    (org-blog-assemble-archive)
-    (org-blog-assemble-tags))
+    ;; make sure every thing shows only once.
+    (setq org-blog-publish-posts (-distinct org-blog-publish-posts)
+          org-blog-publish-posts-remove
+          (-distinct org-blog-publish-posts-remove)
 
-  (org-blog-copy-directory org-blog-static-directory)
-  ;; (org-blog-copy-directory org-blog-assets-directory)
-  )
- 
+          org-blog-publish-tags (-distinct org-blog-publish-tags)
+          org-blog-publish-tags-remove
+          (-distinct org-blog-publish-tags-remove)
+
+          org-blog-publish-assets (-distinct org-blog-publish-assets)
+          org-blog-publish-assets-remove
+          (-distinct org-blog-publish-assets-remove))
+
+    (org-blog-message "%d posts publishing, %d posts are new"
+                      (length org-blog-publish-posts)
+                      (length new-posts))
+    
+    ;; publish posts' page
+    (-each org-blog-publish-posts #'org-blog-publish-file)
+    
+    ;; clean out-of-date posts page
+    (-each org-blog-publish-posts-remove #'org-blog-remove-published-file)
+    
+    ;; publish tags' page
+    (-each org-blog-publish-tags #'org-blog-publish-tag)
+    
+    ;; clean out-of-date tags' page
+    (-each org-blog-publish-tags-remove #'org-blog-remove-published-tag)
+    
+    (org-blog-assemble-index org-blog-normal-posts)
+    ;; (org-static-blog-assemble-rss)
+    (org-blog-assemble-archive org-blog-normal-posts)
+    (org-blog-assemble-tags org-blog-normal-posts)
+
+    (org-blog-handle-static)
+    (org-blog-handle-asset)
+    
+    (org-blog-cache-write)
+    (org-blog-message "Done.")))
 
 (provide 'org-blog)
 ;;; osb-blog.el ends
