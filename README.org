@@ -292,3 +292,5 @@ Note that index ~/~, ~archive/~ and ~tags/~ are always republished.
 - [X] More complicated enviroment of math support.
 - [X] Copy only assets refered in posts.
 - [X] Extract 3rd-party codes out.
+- [ ] Omit external images.
+- [ ] Forbid any other major modes when publishing. (When generating HTML, my lsp-bridge always invokes)

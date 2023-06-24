@@ -30,6 +30,7 @@
 (require 'org)
 (require 'ox-html)
 (require 'denote)
+(require 'json)
 
 (defgroup org-blog nil
   "Settings for a static blog generator using org-mode"
@@ -114,6 +115,9 @@ A relative path to `org-blog-publish-directory'"
   "Formatter of date."
   :type '(string)
   :safe t)
+
+(defcustom org-blog-use-pygmentize nil
+  "Use `Pygments' to highlight src blocks.")
 
 (defcustom org-blog-rss-file "rss.xml"
   "File name of the RSS feed."
@@ -211,6 +215,12 @@ when module is triggered, put content.
 PREAMBLE-HTML should contain style sheets, and
 POSTAMBLE-HTML should contain js script.
 ")
+
+(defcustom org-blog-pre-hook nil
+  "Run before publishing.")
+
+(defcustom org-blog-post-hook nil
+  "Run after publishing.")
 
 (defvar org-blog-cache nil
   "Cache for publishing")
@@ -313,7 +323,7 @@ Another is the item number, which is a integer")
    (-difference actual-list cache-list)
    (-difference cache-list actual-list)))
 
-(defun org-blog-template (title content preamble postamble)
+(defun org-blog-template (title content preamble postamble &optional toc)
   "Create the template that is used to generate the static pages."
   (concat
    "<!DOCTYPE html>\n"
@@ -327,21 +337,26 @@ Another is the item number, which is a integer")
    (apply #'s-concat org-blog-page-head-template)
    "</head>\n"
    "<body>\n"
-   "<div class=\"header\">\n"
+   "<div id=\"header\">\n"
    org-blog-page-header-template
    "</div>\n"
-   "<div class=\"main\">\n"
+   "<div id=\"main\">\n"
+   "<div id=\"toc\">\n"
+   toc
+   "</div>\n"
+   "<div id=\"page\">\n"
    "<div id=\"preamble\" class=\"status\">"
    (apply #'concat preamble org-blog-page-preamble-template)
    "</div>\n"
    "<div id=\"content\">\n"
    content
    "</div>\n"
-   "<div id=\"postamble\" class=\"status\">"
+   "<div id=\"postamble\" class=\"status\">\n"
    (apply #'concat postamble org-blog-page-postamble-template)
    "</div>\n"
    "</div>\n"
-   "<div class=\"footer\">\n"
+   "</div>\n"
+   "<div id=\"footer\">\n"
    org-blog-page-footer-template
    "</div>\n"
    "</body>\n"
@@ -379,26 +394,20 @@ Another is the item number, which is a integer")
          (buffer-list))))
 
 ;; This macro is needed for many of the following functions.
-(defmacro org-blog-with-find-file (file contents &rest body)
-  "Executes BODY in FILE. Use this to insert text into FILE.
+(defmacro org-blog-with-find-file (file contents)
+  "Insert CONTENTS itno FILE.
 The buffer is disposed after the macro exits (unless it already
 existed before)."
   `(save-excursion
      (let ((current-buffer (current-buffer))
            (buffer-exists (org-blog-file-buffer ,file))
-           (result nil)
-	       (contents ,contents))
+           (contents ,contents))
        (if buffer-exists
-           (switch-to-buffer buffer-exists)
-         (find-file ,file))
-       (erase-buffer)
-       (insert contents)
-       (setq result (progn ,@body))
-       (basic-save-buffer)
-       (unless buffer-exists
-         (kill-buffer))
-       (switch-to-buffer current-buffer)
-       result)))
+           (with-current-buffer buffer-exists
+             (erase-buffer)
+             (insert contents)
+             (basic-save-buffer))
+         (f-write-text contents 'utf-8 ,file)))))
 
 (defun org-blog-get-path (post-id)
   "Return the absolte path of post with POST-ID"
@@ -455,32 +464,29 @@ If ALL is `nil', then \"blog\" and \"blogsp\" are excluded."
                        (1- (caar headlines))
                        0))
 	     (start-level prev-level))
-    (concat
-     "<div class=\"toc\">\n"
-     (if headlines
-         (concat
-          "<h2 class=\"toc-title\"> TOC </h2>\n"
-          "<nav id=\"TableOfContents\">\n"
-          (apply
-           'concat
-           (-snoc
-            (--map
-	         (seq-let (level title id) it
-	           (concat
-	            (let* ((cnt (- level prev-level))
-		               (times (if (> cnt 0) (1- cnt) (- cnt))))
-	              (setq prev-level level)
-	              (concat
-                   (s-repeat times
-	                         (cond ((> cnt 0) "\n<ul>\n<li>")
-			                       ((< cnt 0) "</li>\n</ul>\n")))
-	               (if (> cnt 0) "\n<ul>\n<li>" "</li>\n<li>")))
-                (format "\n<a href=\"#%s\"> %s </a>" id title)))
-             headlines)
-            (s-repeat (- prev-level start-level) "</li>\n</ul>\n")))
-          "</nav>\n")
-       "\n")
-    "</div>\n")))
+    (if headlines
+        (concat
+         "<h2 class=\"toc-title\"> TOC </h2>\n"
+         "<nav id=\"TableOfContents\">\n"
+         (apply
+          'concat
+          (-snoc
+           (--map
+	        (seq-let (level title id) it
+	          (concat
+	           (let* ((cnt (- level prev-level))
+		              (times (if (> cnt 0) (1- cnt) (- cnt))))
+	             (setq prev-level level)
+	             (concat
+                  (s-repeat times
+	                        (cond ((> cnt 0) "\n<ul>\n<li>")
+			                      ((< cnt 0) "</li>\n</ul>\n")))
+	              (if (> cnt 0) "\n<ul>\n<li>" "</li>\n<li>")))
+               (format "\n<a href=\"#%s\"> %s </a>" id title)))
+            headlines)
+           (s-repeat (- prev-level start-level) "</li>\n</ul>\n")))
+         "</nav>\n")
+      "\n")))
 
 (defun org-blog-get-tag-tree (posts)
   "Return an association list of tags to posts.
@@ -556,7 +562,9 @@ published HTML version of the post."
     (save-excursion
       (let ((current-buffer (current-buffer))
             (buffer-exists (org-blog-file-buffer (org-blog-get-path post-id)))
-            (result nil))
+            result
+            org-moode-hook
+            prog-mode-hook)
         (with-temp-buffer
           (if buffer-exists
               (insert-buffer-substring buffer-exists)
@@ -602,24 +610,22 @@ Posts are sorted in descending time."
      preamble
      postamble)))
 
-(defun org-blog-post-preamble (post-id &optional toc)
+(defun org-blog-post-preamble (post-id &optional special)
   "Returns the formatted date and headline of the post.
 This function is called for every post and prepended to the post body.
 Modify this function if you want to change a posts headline.
 
-If TOC is nil, this post is `special',
-in which date and tags won't be shown."
+If SPECIAL is non-nil', date and tags won't be shown."
   (concat
    (mapconcat
     (lambda (it)
       (car (assoc-default it org-blog-third-party)))
     org-blog-extras
     "\n")
-   toc
    "<h1 class=\"post-title\"> "
    (org-blog-get-title post-id)
    " </h1>\n"
-   (when toc
+   (unless special
      (concat
       (format-time-string
        (concat "<div class=\"post-date\">"
@@ -1069,10 +1075,29 @@ holding contextual information."
         (format "<div%s>\n%s\n</div>" str contents))
        )))
 
+(defun org-blog-pygmentize (lang code)
+  "Use `Pygments' to highlight CODE with given LANGuage."
+  (let* ((tmp-file "/tmp/org-blog-pygmentize")
+         (qcmd (concat "pygmentize -L \"lexers\" --json |"
+                       "jq '.lexers | map(.)[] | select(.aliases | index(\""
+                       lang
+                       "\"))'"))
+         (lang-exists (shell-command-to-string qcmd))
+         (lang (if (length= lang-exists 0)
+                 "text" lang))
+         (cmd (concat "cat "
+                      tmp-file
+                      " | pygmentize -l \""
+                      lang
+                      "\" -f html -O cssclass=org-src-container,encoding=utf-8,nowrap=True,ensurenl=False -s")))
+    (f-write-text code 'utf-8 tmp-file)
+    (shell-command-to-string cmd)))
+
 (defun org-blog-html-src-block (src-block _contents info)
   "SRC-BLOCK, for integrating with highlight.js"
   (let* ((lang (org-element-property :language src-block))
-	     (code (s-trim (car (org-export-unravel-code src-block))))
+         (code-info (org-export-unravel-code src-block))
+	     (code (org-html-encode-plain-text (car code-info)))
          (lbl (org-html--reference src-block info t))
 	     (label (if lbl (format " id=\"%s\"" lbl) "")))
     ;; Transfer `\t' to `    ' at the beginning or end
@@ -1108,14 +1133,20 @@ holding contextual information."
                        code))
 
               (otherwise
-               (add-to-list 'org-blog-extras 'highlight)
-               (format "<pre><code class=\"language-%s\"%s%s>%s</code></pre>"
-                       (or lang "plaintext")
-                       label
-                       (if (string= lang "html")
-				           " data-editor-type=\"html\""
-			             "")
-                       code))))))
+               (if org-blog-use-pygmentize
+                   (progn
+                     (add-to-list 'org-blog-extras 'highlight-pygments)
+                     (format "<pre class=\"%s\"> %s </pre>"
+                             lang
+                             (org-blog-pygmentize lang code)))
+                   (add-to-list 'org-blog-extras 'highlight)
+                 (format "<pre><code class=\"language-%s\"%s%s>%s</code></pre>"
+                         (or lang "plaintext")
+                         label
+                         (if (string= lang "html")
+				             " data-editor-type=\"html\""
+			               "")
+                         code)))))))
 
 (defun org-blog-html-quote-block (quote-block contents info)
   "Add author and reference.
@@ -1413,8 +1444,9 @@ and wrap <img> into a <a> source attributes info"
               (org-blog-get-title post-id)
               org-blog-meta-title)
       content
-      (org-blog-post-preamble post-id toc)
-      (org-blog-post-postamble post-id)))))
+      (org-blog-post-preamble post-id (not toc))
+      (org-blog-post-postamble post-id)
+	  toc))))
 
 ;;;###autoload
 (defun org-blog-publish ()
@@ -1423,6 +1455,8 @@ Only blog posts that changed since the HTML was created are
 re-rendered."
   (interactive)
   (org-blog-message "Start to publish...")
+
+  (apply #'run-hooks org-blog-pre-hook)
   
   ;; Preprocessing
   (f-mkdir org-blog-publish-directory
@@ -1447,7 +1481,9 @@ re-rendered."
          (org-blog-publish-tags-remove nil)
          (org-blog-publish-assets nil)
          (org-blog-publish-assets-remove nil)
-         (new-posts org-blog-all-posts))
+         (new-posts org-blog-all-posts)
+
+         (org-src-fontify-natively nil))
 
     (org-blog-message "Total posts: %d -- Normal posts: %d. Special posts: %d"
                       (length org-blog-all-posts)
@@ -1513,6 +1549,7 @@ re-rendered."
     (org-blog-handle-asset)
     
     (org-blog-cache-write)
+	(apply #'run-hooks org-blog-post-hook)
     (org-blog-message "Done.")))
 
 (provide 'org-blog)
