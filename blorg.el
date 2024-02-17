@@ -973,6 +973,8 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
   "Publish blog.
 With FORCE, then force project to republish."
   (interactive "P")
+  (message "Start publishing files from %s to %s."
+           denote-directory blorg-output-dir)
   (save-window-excursion
     (let ((blorg-changed-files (ht ("tag" nil) ("category" nil)))
           (blorg-extra-pkgs nil)
@@ -1067,7 +1069,6 @@ With FORCE, then force project to republish."
              (lambda (_)
                (let ((in (f-expand "style.scss" denote-directory))
                      (out (f-expand "static/style.css" denote-directory)))
-                 (message "%s,%s" in out)
                  (when (or (not (f-exists-p out))
                            (blorg-file-is-older-p out in))
                    (shell-command-to-string
