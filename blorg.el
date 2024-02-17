@@ -117,12 +117,10 @@
    (denote--directory-get-files)))
 
 (defun blorg-get-post-output-relative-filename (filename)
-  (let* ((ori-rel (f-relative filename denote-directory))
-         (ori-base (f-base filename)))
-    (f-join "/"
-            (f-dirname ori-rel)
-            (concat (denote-extract-id-from-string filename)
-                    ".html"))))
+  (f-join "/"
+          (f-dirname (f-relative filename denote-directory))
+          (concat (denote-extract-id-from-string filename)
+                  ".html")))
 
 (defun blorg-file-has-publish-tag (filename &optional without-special)
   (and (denote-file-is-note-p filename)
@@ -133,7 +131,7 @@
 (defun blorg-get-special-post-location (filename)
   (let (res)
     (with-temp-buffer
-      (insert-file filename)
+      (insert-file-contents filename)
       (setq res
             (cadr (s-match "^#\\+location:\\s-+\\(.*\\)$"
                            (buffer-substring-no-properties (point-min)
@@ -288,30 +286,28 @@
   (concat "<script src=\"/static/script.js\"></script>\n"))
 
 (defun blorg-html-extra-head ()
-  (let (highlight)
-    (mapconcat
-     (lambda (it)
-       (pcase it
-         ('mermaid "")
-         ('math "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css\">\n")
-         ('highlight (concat "<link rel=\"stylesheet\" href=\"/static/Fantasque/style.css\">\n"
-                             "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/dracula-prism@2.1.16/dist/css/dracula-prism.min.css\">\n"))))
-     blorg-extra-pkgs)))
+  (mapconcat
+   (lambda (it)
+     (pcase it
+       ('mermaid "")
+       ('math "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css\">\n")
+       ('highlight (concat "<link rel=\"stylesheet\" href=\"/static/Fantasque/style.css\">\n"
+                           "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/dracula-prism@2.1.16/dist/css/dracula-prism.min.css\">\n"))))
+   blorg-extra-pkgs))
 
 (defun blorg-html-extra-foot ()
-  (let (highlight)
-    (mapconcat
-     (lambda (it)
-       (pcase it
-         ('mermaid "<script type=\"module\">
+  (mapconcat
+   (lambda (it)
+     (pcase it
+       ('mermaid "<script type=\"module\">
 import mermaid from \"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs\";
 mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
 </script>")
-         ('math (concat "<script defer src=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js\"></script>\n"
-                        "<script defer src=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js\"></script>\n"
-                        "<script src=\"/static/katex.js\"></script>"))
-         ('highlight "<script src=\"/static/prism.js\"></script>\n")))
-     blorg-extra-pkgs)))
+       ('math (concat "<script defer src=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js\"></script>\n"
+                      "<script defer src=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js\"></script>\n"
+                      "<script src=\"/static/katex.js\"></script>"))
+       ('highlight "<script src=\"/static/prism.js\"></script>\n")))
+   blorg-extra-pkgs))
 
 (defun blorg-html-inner-template (contents info)
   (let ((filename (plist-get info :input-file)))
@@ -778,7 +774,7 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
   (-filter 'blorg-file-has-publish-tag
            filenames))
 
-(defun blorg-post-add-tag-and-category-to-changed-files (filename output)
+(defun blorg-post-add-tag-and-category-to-changed-files (filename _output)
   (let ((tags (blorg-get-post-tag filename))
         (category (blorg-get-post-category filename)))
     (ht-set blorg-changed-files "tag"
@@ -928,7 +924,7 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
                              (format "<a class=\"title\" href=\"%s\">%s</a><span class=\"date\">%s</span>\n"
                                      (blorg-get-post-output-relative-filename it)
                                      (blorg-get-post-title it)
-                                     (substring (blorg-get-post-create-date it) 5))
+                                     md)
 
                              "</div>"))
                       res)
