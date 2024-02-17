@@ -105,6 +105,17 @@
 (defun blorg-get-post-category (filename)
   (car (f-split (f-relative filename denote-directory))))
 
+(defun blorg-get-post-cover (filename)
+  "NOTICE: cover should subordinates to `assets'"
+  (when-let* ((cover (cadr (s-match "#\\+cover:\\s-*\\(.+\\)"
+                                   (f-read filename))))
+              (fbase (f-base cover))
+              (fext (f-ext cover)))
+    (unless (f-absolute-p cover)
+      (setq cover (format "/assets/%s.%s"
+                          (md5 fbase) fext)))
+    cover))
+
 (defun blorg-file-is-older-p (file other)
   (< (car (f-modification-time file 'second))
      (car (f-modification-time other 'second))))
@@ -142,9 +153,6 @@
 (defun blorg-try-get-math-chapter (filename)
   (cadr (s-match "\\([0-9]\\)+\\.\\s-"
                  (blorg-get-post-title filename))))
-
-(defun blorg-get-cover (filename)
-  )
 
 
 ;;; Rewrite old functions
@@ -313,6 +321,16 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
   (let ((filename (plist-get info :input-file)))
     (concat
      (format "<div class=\"%s\">\n" (or (plist-get info :blorg-type) "post"))
+     ;; Cover
+     (when-let ((cover (blorg-get-post-cover (plist-get info :input-file))))
+       (format "<img class=\"cover\" src=\"%s\">\n" cover))
+     ;; Document title.
+     (when (plist-get info :with-title)
+       (let ((title (and (plist-get info :with-title)
+                         (plist-get info :title))))
+         (when title
+           (format "<h1 class=\"title\">%s</h1>\n"
+                   (org-export-data title info)))))
      ;; Posts Meta data
      (when (denote-file-is-note-p filename)
        ;; Posts
@@ -361,16 +379,6 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
                     (nth 1 div)
                     (nth 2 div)
                     (plist-get info :html-content-class)))
-          ;; Cover
-          (when-let ((cover (blorg-get-cover (plist-get info :input-file))))
-            (format "<img class=\"cover\" src=\"%s\">\n" cover))
-          ;; Document title.
-          (when (plist-get info :with-title)
-            (let ((title (and (plist-get info :with-title)
-                            (plist-get info :title))))
-              (when title
-                (format "<h1 class=\"title\">%s</h1>\n"
-                      (org-export-data title info)))))
           contents
           (format "</%s>\n" (nth 1 (assq 'content (plist-get info :html-divs))))
           ;; Postamble.
@@ -726,6 +734,8 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
 
 (defun blorg-org-index-item (filename)
   (concat "<div class=\"item\">\n"
+          (format "<image class=\"cover\" src=\"%s\">\n"
+                  (blorg-get-post-cover filename))
           (format "<a class=\"title\" href=\"%s\"> %s </a>\n"
                   (blorg-get-post-output-relative-filename filename)
                   (blorg-get-post-title filename))
