@@ -770,19 +770,21 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
 ;;; Publishing post
 ;;;
 
-(defun blorg-post-filter-files (filenames)
-  (-filter 'blorg-file-has-publish-tag
-           filenames))
+(defun blorg-advice-filter-files (project)
+  (when (string= (org-publish-property :blorg-type project)
+                 "post")
+    (blorg-get-all-files)))
 
 (defun blorg-post-add-tag-and-category-to-changed-files (filename _output)
-  (let ((tags (blorg-get-post-tag filename))
-        (category (blorg-get-post-category filename)))
-    (ht-set blorg-changed-files "tag"
-            (-union (ht-get blorg-changed-files "tag")
-                    tags))
-    (ht-set blorg-changed-files "category"
-            (-union (list category)
-                    (ht-get blorg-changed-files "category")))))
+  (when (denote-filename-is-note-p filename)
+    (let ((tags (blorg-get-post-tag filename))
+          (category (blorg-get-post-category filename)))
+      (ht-set blorg-changed-files "tag"
+              (-union (ht-get blorg-changed-files "tag")
+                      tags))
+      (ht-set blorg-changed-files "category"
+              (-union (list category)
+                      (ht-get blorg-changed-files "category"))))))
 
 
 ;;; Publishing taxonomy
@@ -946,6 +948,7 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
 ;;;
 
 (defun blorg-post-publishing-function (plist filename pub-dir)
+  "FIX: clearn `blorg-extra-pkgs', and footnote table."
   (let ((blorg-footnote-table (ht-create)))
     (org-html-publish-to-html plist filename pub-dir))
   (setq blorg-extra-pkgs nil))
@@ -991,19 +994,14 @@ With FORCE, then force project to republish."
              :publishing-directory blorg-output-dir
              :recursive t
              :with-toc t
+             :blorg-type "post"
              :publishing-function 'blorg-post-publishing-function
              :preparation-function
              (lambda (plist)
-               (advice-add 'org-publish-get-base-files :filter-return
-                           'blorg-post-filter-files)
+               (advice-add 'org-publish-get-base-files :before-until
+                           'blorg-advice-filter-files)
                (add-hook 'org-publish-after-publishing-hook
-                         'blorg-post-add-tag-and-category-to-changed-files))
-             :completion-function
-             (lambda (plist)
-               (advice-remove 'org-publish-get-base-files
-                              'blorg-post-filter-files)
-               (remove-hook 'org-publish-after-publishing-hook
-                            'blorg-post-add-tag-and-category-to-changed-files)))
+                         'blorg-post-add-tag-and-category-to-changed-files)))
             
             (blorg-compose-project
              "blorg-index"
@@ -1014,6 +1012,15 @@ With FORCE, then force project to republish."
              :preparation-function 'blorg-assemble-index
              :blorg-type "index"
              :with-title nil)
+
+            (blorg-compose-project
+             "blorg-archive"
+             :base-directory blorg-cache-dir
+             :publishing-directory blorg-output-dir
+             :exclude ".*"
+             :include '("archive.org")
+             :blorg-type "archive"
+             :preparation-function 'blorg-assemble-archive)
             
             (blorg-compose-project
              "blorg-taxonomy"
@@ -1041,15 +1048,6 @@ With FORCE, then force project to republish."
              :preparation-function
              (lambda (_)
                (blorg-assemble-each-taxonomy "tag" _)))
-            
-            (blorg-compose-project
-             "blorg-archive"
-             :base-directory blorg-cache-dir
-             :publishing-directory blorg-output-dir
-             :exclude ".*"
-             :include '("archive.org")
-             :blorg-type "archive"
-             :preparation-function 'blorg-assemble-archive)
 
             (blorg-compose-project
              "blorg-asset"
