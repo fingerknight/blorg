@@ -734,8 +734,9 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
 
 (defun blorg-org-index-item (filename)
   (concat "<div class=\"item\">\n"
-          (format "<image class=\"cover\" src=\"%s\">\n"
-                  (blorg-get-post-cover filename))
+          (when-let ((cover (blorg-get-post-cover filename)))
+            (format "<image class=\"cover\" src=\"%s\">\n"
+                    cover))
           (format "<a class=\"title\" href=\"%s\"> %s </a>\n"
                   (blorg-get-post-output-relative-filename filename)
                   (blorg-get-post-title filename))
