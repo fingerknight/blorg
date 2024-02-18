@@ -5,6 +5,7 @@
 (require 'f)
 (require 's)
 (require 'ht)
+(require 'ts)
 (require 'ox)
 (require 'ox-publish)
 (require 'ox-html)
@@ -117,8 +118,8 @@
     cover))
 
 (defun blorg-file-is-older-p (file other)
-  (< (car (f-modification-time file 'second))
-     (car (f-modification-time other 'second))))
+  (ts< (ts-parse (denote-extract-id-from-string file))
+       (ts-parse (denote-extract-id-from-string other))))
 
 (defun blorg-post-is-special-p (filename)
   (member blorg-page-tag (blorg-get-post-tag filename)))
@@ -976,7 +977,7 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
                            pub-dir)))
     (unless (or (f-dir-p filename)
                 (and (f-exists-p output)
-                     (blorg-file-is-older-p output filename)))
+                     (f-older-p output filename)))
       (copy-file filename output t))
     ;; Return file name.
     output))
@@ -1079,7 +1080,7 @@ With FORCE, then force project to republish."
                (let ((in (f-expand "style.scss" denote-directory))
                      (out (f-expand "static/style.css" denote-directory)))
                  (when (or (not (f-exists-p out))
-                           (blorg-file-is-older-p out in))
+                           (f-older-p out in))
                    (shell-command-to-string
                     (format "sass %s %s" in out)))))))))
       (org-publish-projects projects))))
