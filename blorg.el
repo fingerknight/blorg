@@ -479,7 +479,7 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
                                                "axiom"
                                                "remark"
                                                "solution"
-                                               "exercise"
+                                               "question"
                                                ))))
          (is-proof-p (member math-block '("proof" "solution"))))
 
