@@ -489,7 +489,10 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
                                 blorg-math-number))
              (title-string (format "<span class=\"number\">%s %s </span>%s"
                                    (s-upper-camel-case math-block)
-                                   (if is-proof-p "" num-string)
+                                   (if (or is-proof-p
+                                           (is-question-p (eq math-block "question")))
+                                       ""
+                                     num-string)
                                    (if name (format "(%s) " name) ""))))
         (setq attributes (plist-put attributes :class "mathblock")
               contents (if (s-starts-with-p "<p>" contents)
