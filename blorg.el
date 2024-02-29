@@ -20,7 +20,9 @@
    :with-entities nil
    :html-head-include-default-style nil
    :html-head (concat "<link rel=\"shortcut icon\" href=\"/static/favicon.ico\" type=\"image/x-icon\">\n"
-                      "<link rel=\"stylesheet\" href=\"/static/Slippery/style.css\">"
+                      "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">"
+                      "<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>"
+                      "<link href=\"https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,700;1,400;1,700&display=swap\" rel=\"stylesheet\">"
                       "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@callmebill/lxgw-wenkai-web@latest/style.css\">"
                       "<link rel=\"stylesheet\" type=\"text/css\" href=\"/static/style.css\">\n")
    :html-preamble 'blorg-html-preamble
