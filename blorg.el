@@ -478,8 +478,10 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
                                                "proof"
                                                "axiom"
                                                "remark"
-                                               "solution"))))
-         (is-proof-p (equal math-block "proof")))
+                                               "solution"
+                                               "exercise"
+                                               ))))
+         (is-proof-p (member math-block '("proof" "solution"))))
 
     (when math-block
       (let* ((num-string (format "%s.%s"
