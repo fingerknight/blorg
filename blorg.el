@@ -490,7 +490,7 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
              (title-string (format "<span class=\"number\">%s %s </span>%s"
                                    (s-upper-camel-case math-block)
                                    (if (or is-proof-p
-                                           (eq math-block "question"))
+                                           (equal math-block "question"))
                                        ""
                                      num-string)
                                    (if name (format "(%s) " name) ""))))
