@@ -299,13 +299,13 @@
 (defun blorg-html-build-extra-head ()
   (mapconcat
    (lambda (it)
-     (assoc it blorg-html-extra-head))
+     (cdr (assoc it blorg-html-extra-head)))
    blorg-extra-pkgs))
 
 (defun blorg-html-build-extra-foot ()
   (mapconcat
    (lambda (it)
-     (assoc it blorg-html-extra-foot))
+     (cdr (assoc it blorg-html-extra-foot)))
    blorg-extra-pkgs))
 
 (defun blorg-html-inner-template (contents info)
