@@ -19,12 +19,6 @@
    :with-toc nil
    :with-entities nil
    :html-head-include-default-style nil
-   :html-head (concat "<link rel=\"shortcut icon\" href=\"/static/favicon.ico\" type=\"image/x-icon\">\n"
-                      "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">"
-                      "<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>"
-                      "<link href=\"https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,700;1,400;1,700&display=swap\" rel=\"stylesheet\">"
-                      "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@callmebill/lxgw-wenkai-web@latest/style.css\">"
-                      "<link rel=\"stylesheet\" type=\"text/css\" href=\"/static/style.css\">\n")
    :html-preamble 'blorg-html-preamble
    :html-postamble 'blorg-html-postamble
    :with-sub-superscript nil
@@ -56,6 +50,12 @@
 
 (defcustom blorg-cache-dir org-publish-timestamp-directory
   "Cache dir")
+
+(defcustom blorg-html-extra-head nil
+  "Extra header, ALIST.")
+
+(defcustom blorg-html-extra-foot nil
+  "Extra footer, ALIST.")
 
 (defcustom blorg-prism-js-mapping
   '((elisp . lisp)
@@ -296,28 +296,16 @@
 (defun blorg-html-build-foot (info)
   (concat "<script src=\"/static/script.js\"></script>\n"))
 
-(defun blorg-html-extra-head ()
+(defun blorg-html-build-extra-head ()
   (mapconcat
    (lambda (it)
-     (pcase it
-       ('mermaid "")
-       ('math "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css\">\n")
-       ('highlight (concat "<link rel=\"stylesheet\" href=\"/static/Fantasque/style.css\">\n"
-                           "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/dracula-prism@2.1.16/dist/css/dracula-prism.min.css\">\n"))))
+     (assoc it blorg-html-extra-head))
    blorg-extra-pkgs))
 
-(defun blorg-html-extra-foot ()
+(defun blorg-html-build-extra-foot ()
   (mapconcat
    (lambda (it)
-     (pcase it
-       ('mermaid "<script type=\"module\">
-import mermaid from \"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs\";
-mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
-</script>")
-       ('math (concat "<script defer src=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js\"></script>\n"
-                      "<script defer src=\"https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js\"></script>\n"
-                      "<script src=\"/static/katex.js\"></script>"))
-       ('highlight "<script src=\"/static/prism.js\"></script>\n")))
+     (assoc it blorg-html-extra-foot))
    blorg-extra-pkgs))
 
 (defun blorg-html-inner-template (contents info)
@@ -370,8 +358,8 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
           "<html lang=\"zh\">\n"
           "<head>\n"
           (blorg-html-build-meta info)
-          (blorg-html-extra-head)
           (org-html--build-head info)
+          (blorg-html-build-extra-head)
           "</head>\n"
           "<body>\n"
           ;; Preamble.
@@ -387,7 +375,7 @@ mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
           ;; Postamble.
           (org-html--build-pre/postamble 'postamble info)
           (blorg-html-build-foot info)
-          (blorg-html-extra-foot)
+          (blorg-html-build-extra-foot)
           "</body>\n"
           "</html>"))
 
