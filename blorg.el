@@ -1067,7 +1067,7 @@ With FORCE, then force project to republish."
              "blorg-static"
              :base-directory (expand-file-name "static" denote-directory)
              :publishing-directory (expand-file-name "static" blorg-output-dir)
-             :base-extension "ico\\|css\\|js\\|svg\\|woff\\|woff2\\|otf"
+             :base-extension "ico\\|css\\|js\\|svg\\|woff\\|woff2\\|otf\\|ttf"
              :recursive t
              :publishing-function 'org-publish-attachment
              :preparation-function
