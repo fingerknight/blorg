@@ -27,7 +27,7 @@
    )
   "Common Property list of Blorg.")
 
-(defcustom blorg-title "Ward of Dust"
+(defcustom blorg-title "Ward of Bardust"
   "Title of blog")
 
 (defcustom blorg-post-tag "post"
@@ -291,7 +291,7 @@
                         title
                       (format "%s - %s" title blorg-title))
                     )
-            "<meta name=\"author\" content=\"MrDust\">\n")))
+            "<meta name=\"author\" content=\"Bardust\">\n")))
 
 (defun blorg-html-build-foot (info)
   (concat "<script src=\"/static/script.js\"></script>\n"))
